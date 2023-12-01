@@ -4,6 +4,8 @@ package dayX
 import "core:fmt"
 import "core:mem"
 import "core:os"
+import "core:strconv"
+import "core:strings"
 import "core:testing"
 import "core:time"
 
