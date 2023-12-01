@@ -24,6 +24,7 @@ main :: proc() {
 
     alloc := mem.arena_allocator(&solution_arena)
     context.allocator = alloc
+    context.temp_allocator = alloc
 
     pt1_start := time.now()
     pt1_ans := part_1(input)
