@@ -1,2 +1,5 @@
 # AoC_2023
-Advent of Code 2023 solutions
+
+Solutions to Advent of Code 2023
+
+Most likely done in Odin
