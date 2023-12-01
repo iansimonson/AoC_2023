@@ -77,6 +77,11 @@ part_2 :: proc(data: string) -> int {
                     first = 9
                     break loop1
                 }
+            case 'z':
+                if strings.has_prefix(line[i:], "zero") {
+                    first = 0
+                    break loop1
+                }
             case '0'..='9':
                 first = int(c - '0')
                 break loop1
@@ -123,6 +128,11 @@ part_2 :: proc(data: string) -> int {
             case 'n':
                 if strings.has_prefix(line[i:], "nine") {
                     last = 9
+                    break loop2
+                }
+            case 'z':
+                if strings.has_prefix(line[i:], "zero") {
+                    last = 0
                     break loop2
                 }
             case '0'..='9':
