@@ -1,16 +1,17 @@
 //+ignore
 package dayX
 
-import "core:testing"
-import "core:time"
+import "core:fmt"
 import "core:mem"
 import "core:os"
+import "core:testing"
+import "core:time"
 
-dayX_pt1 :: proc(data: string) -> int {
+part_1 :: proc(data: string) -> int {
     return 0
 }
 
-dayX_pt2 :: proc(data: string) -> int {
+part_2 :: proc(data: string) -> int {
     return 0
 }
 
@@ -23,14 +24,14 @@ main :: proc() {
     context.allocator = alloc
 
     pt1_start := time.now()
-    pt1_ans := dayX_pt1(dayX_data)
+    pt1_ans := part_1(input)
     pt1_end := time.now()
     fmt.println("P1:", pt1_ans, "Time:", time.diff(pt1_start, pt1_end), "Memory Used:", solution_arena.peak_used)
-    
+
     free_all(context.allocator)
 
     pt2_start := time.now()
-    pt2_ans := dayX_pt2(dayX_data)
+    pt2_ans := part_2(input)
     pt2_end := time.now()
     fmt.println("P2:", pt2_ans, "Time:", time.diff(pt2_start, pt2_end), "Memory Used:", solution_arena.peak_used)
 
@@ -39,10 +40,14 @@ main :: proc() {
 
 
 @(test)
-dayX_test :: proc(t: ^testing.T) {
-    testing.expect_value(t, dayX_pt1(test_data), 1234)
-    testing.expect_value(t, dayX_pt2(test_data), 1234)
+part_1_test :: proc(t: ^testing.T) {
+    testing.expect_value(t, part_1(test_input), 1234)
 }
 
-dayX_data := #load("./input.txt", string)
-dayX_test_data := ``
+@(test)
+part_2_test :: proc(t: ^testing.T) {
+    testing.expect_value(t, part_2(test_input), 1234)
+}
+
+input := #load("./input.txt", string)
+test_input := ``
