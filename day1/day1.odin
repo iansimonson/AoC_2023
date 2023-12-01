@@ -3,9 +3,9 @@ package day1
 import "core:fmt"
 import "core:mem"
 import "core:os"
+import "core:strings"
 import "core:testing"
 import "core:time"
-import "core:strings"
 
 part_1 :: proc(data: string) -> int {
     data := data
@@ -13,7 +13,7 @@ part_1 :: proc(data: string) -> int {
     for line in strings.split_lines_iterator(&data) {
         first, last: int
         for c in line {
-            if '0' <= c  && c <= '9' {
+            if '0' <= c && c <= '9' {
                 first = int(c - '0')
                 break
             }
@@ -35,7 +35,7 @@ part_2 :: proc(data: string) -> int {
     for line in strings.split_lines_iterator(&data) {
         line := line
         first, last: int
-        loop1: for i in 0..<len(line) {
+        loop1: for i in 0 ..< len(line) {
             c := line[i]
             switch c {
             case 'o':
@@ -82,7 +82,7 @@ part_2 :: proc(data: string) -> int {
                     first = 0
                     break loop1
                 }
-            case '0'..='9':
+            case '0' ..= '9':
                 first = int(c - '0')
                 break loop1
             }
@@ -135,7 +135,7 @@ part_2 :: proc(data: string) -> int {
                     last = 0
                     break loop2
                 }
-            case '0'..='9':
+            case '0' ..= '9':
                 last = int(c - '0')
                 break loop2
             }
