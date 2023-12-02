@@ -27,6 +27,10 @@ part_1 :: proc(data: string) -> int {
                 value, ok = strconv.parse_int(vc)
                 assert(ok)
             } else {
+                // NOTE: this could just match vc[0] against 'r', 'g', 'b'
+                // but the optimized build ended up being almost the same in both
+                // cases i.e. the perf diff is in the noise on my computer
+                // so I'm leaving how I solved it rather than the "better" version
                 switch {
                 case strings.has_prefix(vc, "red"):
                     if value > p1_limits.r do continue outer
