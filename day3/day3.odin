@@ -16,9 +16,11 @@ part_1 :: proc(data: []u8) -> (total: int) {
     assert(newline != -1)
     grid_width := newline + 1
 
-    near_symbol :: proc(grid: []u8, idx, width: int) -> bool {
-        neighbors := []int{idx - width - 1, idx - width, idx - width + 1, idx - 1, idx + 1, idx + width - 1, idx + width, idx + width + 1}
-        for n in neighbors {
+    offsets := []int{-grid_width - 1, -grid_width, -grid_width + 1, -1, +1, grid_width - 1, grid_width, grid_width + 1}
+
+    near_symbol :: proc(grid: []u8, offsets: []int, idx: int) -> bool {
+        for offset in offsets {
+            n := idx + offset
             if n < 0 || n > len(grid) do continue
             switch grid[n] {
             case '0'..='9', '.', '\n':
@@ -32,37 +34,15 @@ part_1 :: proc(data: []u8) -> (total: int) {
     
     for i := 0; i < len(data); {
         v := data[i]
-        switch v {
-        case '0'..='9':
-            if near_symbol(data, i, grid_width) {
-                num_start := i
-                l_start: for num_start >= 0 {
-                    switch data[num_start] {
-                    case '0'..='9':
-                        num_start -= 1
-                    case:
-                        num_start += 1
-                        break l_start
-                    }
-                }
-                num_start = max(0, num_start)
-
-                num_end := i
-                l_end: for num_end <= len(data) {
-                    switch data[num_end] {
-                    case '0'..='9':
-                        num_end += 1
-                    case:
-                        break l_end// end of ranges is exclusive
-                    }
-                }
-                value, _ := strconv.parse_int(string(data[num_start:num_end]))
-                total += value
-                i = num_end
-                continue
-            }
+        if is_digit(v) && near_symbol(data, offsets, i) {
+            ns, ne := num_start(data, i), num_end(data, i)
+            value, _ := strconv.parse_int(string(data[ns:ne]))
+            total += value
+            i = ne
+            continue
+        } else {
+            i += 1
         }
-        i += 1
     }
     
     return
@@ -73,108 +53,71 @@ part_2 :: proc(data: []u8) -> (total: int) {
     assert(newline != -1)
     grid_width := newline + 1
 
+    parse_part :: proc(data: []u8, offset: int, p1, p2: ^int) {
+        ns := num_start(data, offset)
+        ne := num_end(data, offset)
+        v, _ := strconv.parse_int(string(data[ns:ne]))
+        if p1^ == -1 do p1^ = v
+        else do p2^ = v
+    }
+
     for i in 0..<len(data) {
-        switch data[i] {
-        case '*':
+        if data[i] == '*' {
             p1, p2 := -1, -1
-            top_row_one_num: bool
-            bottom_row_one_num: bool
-            // find if two gears
-            // at most 2 nums above, 2 below or one to each side
+
             if i - 1 >= 0 && is_digit(data[i-1]) {
                 ns := num_start(data, i - 1)
                 p1, _ = strconv.parse_int(string(data[ns:i]))
             }
+
             if i + 1 < len(data) && is_digit(data[i + 1]) {
-                ns := num_end(data, i + 1)
-                v, _ := strconv.parse_int(string(data[i + 1:ns]))
-                if p1 == -1 {
-                    p1 = v
-                } else {
-                    p2 = v
+                parse_part(data, i + 1, &p1, &p2)
+            }
+
+            // if the top center is a digit then we only have a single
+            // number in the top row that is adjacent
+            if i - grid_width >= 0 && is_digit(data[i - grid_width]) {
+                if p1 != -1 && p2 != -1 do continue // more than 2 part numbers, not a gear
+
+                parse_part(data, i - grid_width, &p1, &p2)
+            } else {
+                // we _might_ have two numbers, one that ends at top left and one that starts at top right
+                if i - grid_width - 1 >= 0 && is_digit(data[i - grid_width - 1]) {
+                    if p1 != -1 && p2 != -1 do continue
+    
+                    parse_part(data, i - grid_width - 1, &p1, &p2)
+                }
+
+                if  i - grid_width + 1 >= 0 && is_digit(data[i - grid_width + 1]) {
+                    if p1 != -1 && p2 != -1 do continue
+    
+                    parse_part(data, i - grid_width + 1, &p1, &p2)
                 }
             }
 
-            if i - grid_width - 1 >= 0 && is_digit(data[i - grid_width - 1]) {
-                if p1 != -1 && p2 != -1 do continue // more than 2 part numbers, not a gear
+            // same here, check center bottom first to see if we have a single
+            // or possibly two numbers
+            if i + grid_width < len(data) && is_digit(data[i + grid_width]) {
+                if p1 != -1 && p2 != -1 do continue
 
-                ns := num_start(data, i - grid_width - 1)
-                ne := num_end(data, i - grid_width - 1)
+                parse_part(data, i + grid_width, &p1, &p2)
+            } else {
+                if i + grid_width - 1 < len(data) && is_digit(data[i + grid_width - 1]) {
+                    if p1 != -1 && p2 != -1 do continue
+    
+                    parse_part(data, i + grid_width - 1, &p1, &p2)
+                }
 
-                v, _ := strconv.parse_int(string(data[ns:ne]))
-                if p1 == -1 do p1 = v
-                else do p2 = v
-
-                if ne > i - grid_width do top_row_one_num = true
-            }
-
-            if !top_row_one_num && i - grid_width >= 0 && is_digit(data[i - grid_width]) {
-                if p1 != -1 && p2 != -1 do continue // more than 2 part numbers, not a gear
-
-                ns := num_start(data, i - grid_width)
-                ne := num_end(data, i - grid_width)
-
-                v, _ := strconv.parse_int(string(data[ns:ne]))
-                if p1 == -1 do p1 = v
-                else do p2 = v
-
-                top_row_one_num = true
-            }
-
-            if !top_row_one_num && i - grid_width + 1 >= 0 && is_digit(data[i - grid_width + 1]) {
-                if p1 != -1 && p2 != -1 do continue // more than 2 part numbers, not a gear
-
-                ns := num_start(data, i - grid_width + 1)
-                ne := num_end(data, i - grid_width + 1)
-
-                v, _ := strconv.parse_int(string(data[ns:ne]))
-                if p1 == -1 do p1 = v
-                else do p2 = v
-            }
-
-            if i + grid_width - 1 < len(data) && is_digit(data[i + grid_width - 1]) {
-                if p1 != -1 && p2 != -1 do continue // more than 2 part numbers, not a gear
-
-                ns := num_start(data, i + grid_width - 1)
-                ne := num_end(data, i + grid_width - 1)
-
-                v, _ := strconv.parse_int(string(data[ns:ne]))
-                if p1 == -1 do p1 = v
-                else do p2 = v
-
-                if ne > i + grid_width do bottom_row_one_num = true
-            }
-
-            if !bottom_row_one_num && i + grid_width < len(data) && is_digit(data[i + grid_width]) {
-                if p1 != -1 && p2 != -1 do continue // more than 2 part numbers, not a gear
-
-                ns := num_start(data, i + grid_width)
-                ne := num_end(data, i + grid_width)
-
-                v, _ := strconv.parse_int(string(data[ns:ne]))
-                if p1 == -1 do p1 = v
-                else do p2 = v
-
-
-                bottom_row_one_num = true
-            }
-
-            if !bottom_row_one_num && i + grid_width + 1 < len(data) && is_digit(data[i + grid_width + 1]) {
-                if p1 != -1 && p2 != -1 do continue // more than 2 part numbers, not a gear
-
-                ns := num_start(data, i + grid_width + 1)
-                ne := num_end(data, i + grid_width + 1)
-
-                v, _ := strconv.parse_int(string(data[ns:ne]))
-                if p1 == -1 do p1 = v
-                else do p2 = v
+                if i + grid_width + 1 < len(data) && is_digit(data[i + grid_width + 1]) {
+                    if p1 != -1 && p2 != -1 do continue
+    
+                    parse_part(data, i + grid_width + 1, &p1, &p2)
+                }
             }
 
             if p1 != -1 && p2 != -1 {
                 total += p1 * p2
             }
-
-        case:
         }
     }
     return
