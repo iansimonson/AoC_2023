@@ -128,6 +128,69 @@ part_2 :: proc(data: string) -> (total: int) {
     return
 }
 
+part_2_better :: proc(data: string) -> (total: int) {
+    data := data
+    winning := make([dynamic]u16, 0, 10)
+    have := make([dynamic]u16, 0, 25)
+    cards := make([]int, 250) // larger than we have
+    slice.fill(cards[:], 1)
+
+    card: int
+    for line in strings.split_lines_iterator(&data) {
+        line := line
+        clear(&winning)
+        clear(&have)
+        colon := strings.index(line, ":")
+        assert(colon != -1)
+        line = line[colon + 2:]
+        wins, _ := strings.split_iterator(&line, "|")
+        hs, _ := strings.split_iterator(&line, "|")
+        for w in strings.split_iterator(&wins, " ") {
+            if len(w) == 0 do continue
+            w := w
+            v := cast(^u16) raw_data(w)
+            append(&winning, v^)
+        }
+
+        for w in strings.split_iterator(&hs, " ") {
+            if len(w) == 0 do continue
+
+            w := w
+            v := cast(^u16) raw_data(w)
+            append(&have, v^)
+        }
+
+        win := winning[:]
+        haves := have[:]
+        slice.sort(win)
+        slice.sort(haves)
+        matches: int
+        for len(win) > 0 && len(haves) > 0 {
+            if haves[0] == win[0] {
+                matches += 1
+                haves = haves[1:]
+                win = win[1:]
+            } else if haves[0] < win[0] {
+                haves = haves[1:]
+            } else if win[0] < haves[0] {
+                win = win[1:]
+            }
+        }
+        
+        for i in 1..=matches {
+            cards[card + i] += cards[card]
+        }
+        card += 1
+    }
+
+    for c in cards[:card] {
+        total += c
+    }
+
+
+    return
+}
+
 main :: proc() {
     arena_backing := make([]u8, 8 * mem.Megabyte)
     solution_arena: mem.Arena
@@ -151,6 +214,16 @@ main :: proc() {
     fmt.println("P2:", pt2_ans, "Time:", time.diff(pt2_start, pt2_end), "Memory Used:", solution_arena.peak_used)
 
     free_all(context.allocator)
+    solution_arena.peak_used = 0
+
+    ptb2_start := time.now()
+    ptb2_ans := part_2_better(input)
+    ptb2_end := time.now()
+    fmt.println("P2 (better):", ptb2_ans, "Time:", time.diff(ptb2_start, ptb2_end), "Memory Used:", solution_arena.peak_used)
+
+    free_all(context.allocator)
+    solution_arena.peak_used = 0
+
 }
 
 
