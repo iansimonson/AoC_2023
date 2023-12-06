@@ -32,6 +32,7 @@ main :: proc() {
     fmt.println("P1:", pt1_ans, "Time:", time.diff(pt1_start, pt1_end), "Memory Used:", solution_arena.peak_used)
 
     free_all(context.allocator)
+    solution_arena.peak_used = 0
 
     pt2_start := time.now()
     pt2_ans := part_2(input)
@@ -39,6 +40,7 @@ main :: proc() {
     fmt.println("P2:", pt2_ans, "Time:", time.diff(pt2_start, pt2_end), "Memory Used:", solution_arena.peak_used)
 
     free_all(context.allocator)
+    solution_arena.peak_used = 0
 }
 
 
