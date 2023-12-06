@@ -89,6 +89,43 @@ part_2 :: proc(data: string) -> int {
     return result
 }
 
+/* I did not think of just using quadratic formula
+    immediately and figured I'd have to do so
+    for part 2...but then my part 2 ran in 20ms...
+    part_2_better is what it should've been
+*/
+part_2_better :: proc(data: string) -> int {
+    data := data
+    times_str, _ := strings.split_lines_iterator(&data)
+    distances_str, _ := strings.split_lines_iterator(&data)
+
+    ts_colon := strings.index(times_str, ":")
+    times_str = strings.trim_left_space(times_str[ts_colon + 1:])
+    ds_colon := strings.index(distances_str, ":")
+    distances_str = strings.trim_left_space(distances_str[ds_colon + 1:])
+
+    time, distance: int
+    for c in times_str {
+        if '0' <= c && c <= '9' {
+            time = time * 10 + int(c - '0')
+        }
+    }
+
+    for c in distances_str {
+        if '0' <= c && c <= '9' {
+            distance = distance * 10 + int(c - '0')
+        }
+    }
+
+
+    assert(time * time > 4 * (distance + 1))
+    dsc := math.sqrt(f64(time * time - 4*(distance + 1)))
+    r1 := int(f64(time) + dsc) / 2
+    r2 := int(f64(time) - dsc) / 2
+
+    return (r1 - r2)
+}
+
 main :: proc() {
     arena_backing := make([]u8, 8 * mem.Megabyte)
     solution_arena: mem.Arena
@@ -113,6 +150,15 @@ main :: proc() {
 
     free_all(context.allocator)
     solution_arena.peak_used = 0
+
+    pt2_b_start := time.now()
+    pt2_b_ans := part_2_better(input)
+    pt2_b_end := time.now()
+    fmt.println(pt2_b_start._nsec)
+    fmt.println("P2:", pt2_b_ans, "Time:", time.duration_nanoseconds(time.diff(pt2_b_start, pt2_b_end)), "Memory Used:", solution_arena.peak_used)
+
+    free_all(context.allocator)
+    solution_arena.peak_used = 0
 }
 
 
@@ -124,6 +170,11 @@ part_1_test :: proc(t: ^testing.T) {
 @(test)
 part_2_test :: proc(t: ^testing.T) {
     testing.expect_value(t, part_2(test_input), 71503)
+}
+
+@(test)
+part_2_better_test :: proc(t: ^testing.T) {
+    testing.expect_value(t, part_2_better(test_input), 71503)
 }
 
 input := #load("./input.txt", string)
