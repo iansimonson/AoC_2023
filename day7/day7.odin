@@ -3,12 +3,16 @@ package day7
 import "core:fmt"
 import "core:mem"
 import "core:os"
+import "core:slice"
 import "core:strconv"
 import "core:strings"
 import "core:testing"
 import "core:time"
 
-Hands :: bit_set[Hand_Type;u32]
+// the bit_set is just a nicety
+// could easily just do 1 << Hand_Type
+// ourself
+Hand :: bit_set[Hand_Type;u8]
 Hand_Type :: enum {
     High,
     Pair,
@@ -19,33 +23,174 @@ Hand_Type :: enum {
     Five_Kind,
 }
 
+hand_transition :: proc(hand: Hand_Type, match_val: u8) -> (result: Hand_Type) {
+    result = hand
+    switch hand {
+    case .High:
+        if match_val == 2 do result = .Pair
+        else do assert(match_val == 1)
+    case .Pair:
+        if match_val == 2 do result = .Two_Pair
+        else if match_val == 3 do result = .Three_Kind
+        else do assert(match_val == 1)
+    case .Two_Pair:
+        if match_val == 3 do result = .Full_House
+        else do assert(match_val == 1)
+    case .Three_Kind:
+        if match_val == 2 do result = .Full_House
+        else if match_val == 4 do result = .Four_Kind
+        else do assert(match_val == 1)
+    case .Four_Kind:
+        if match_val == 5 do result = .Five_Kind
+        else do assert(match_val == 1)
+    case .Five_Kind, .Full_House:
+        // can only transition to this shouldn't be in this state here
+        assert(false)
+    case:
+        assert(false)
+    }
+    return
+}
+
+CHAR_MAP := [26]u8 {
+    'T' - 'A' = 10,
+    'J' - 'A' = 11,
+    'Q' - 'A' = 12,
+    'K' - 'A' = 13,
+    'A' - 'A' = 14,
+}
+
+CHAR_MAP_2 := [26]u8 {
+    'T' - 'A' = 10,
+    'Q' - 'A' = 12,
+    'K' - 'A' = 13,
+    'A' - 'A' = 14,
+}
+
 part_1 :: proc(data: string) -> int {
-    
-    matches: [max(u8)]u8
-    all_hands := make([dynamic]u64, 0, 150)
-    all_bets := make([dynamic]int, 0, 150)
-    buffer: [8]u8
+
+    all_hands := make([dynamic][2]u64, 0, 150)
+    matches: [15]u8 // map of our current hand
+    buffer: [8]u8 // for fun :)
     hand_idx := 3
-    hand: Hands
+    bet: u64
+    hand: Hand_Type // nil == High
     for c, i in data {
         switch c {
-        case '0'..='9', 'T', 'J', 'Q', 'K', 'A':
-            buffer[hand_idx] = u8(c)
-            matches[int(c)] += 1
-            if hand == {} do hand = {.High}
-            else if hand == {.High} && matches[int(c)] == 1 {
-                // nothing
-            } else if hand == {.High} && matches[int(c)] == 2 {
-                hand = {.Pair}
+        case '0' ..= '9':
+            if hand_idx < 8 {     // parsing hand still
+                buffer[hand_idx] = u8(c) - '0'
+                hand_idx += 1
+                matches[c - '0'] += 1
+                match_val := matches[c - '0']
+
+                hand = hand_transition(hand, match_val)
+
+            } else {
+                bet = bet * 10 + u64(c - '0')
             }
+        case 'T', 'J', 'Q', 'K', 'A':
+            num_val := CHAR_MAP[c - 'A']
+            buffer[hand_idx] = num_val
+            hand_idx += 1
+            matches[num_val] += 1
+            match_val := matches[num_val]
+
+            hand = hand_transition(hand, match_val)
         case ' ':
+            hand_val := transmute(u8) Hand{hand}
+            buffer[0] = hand_val
+        case '\n':
+            buf_val := u64(transmute(u64be)buffer)
+
+            append(&all_hands, [2]u64{buf_val, bet})
+            hand_idx = 3
+            matches = {}
+            hand = .High
+            bet = 0
 
         }
     }
+    slice.sort_by(all_hands[:], proc(p1, p2: [2]u64) -> bool {
+        return p1[0] < p2[0]
+    });
+
+    result: int
+    for hand, i in all_hands {
+        result += (i + 1) * int(hand[1])
+    }
+    return result
 }
 
 part_2 :: proc(data: string) -> int {
-    return 0
+    all_hands := make([dynamic][2]u64, 0, 150)
+    matches: [15]u8 // map of our current hand
+    buffer: [8]u8 // for fun :)
+    hand_idx := 3
+    bet: u64
+    hand: Hand_Type // nil == High
+    jokers: int
+    for c, i in data {
+        switch c {
+        case '0' ..= '9':
+            if hand_idx < 8 {     // parsing hand still
+                buffer[hand_idx] = u8(c) - '0'
+                hand_idx += 1
+                matches[c - '0'] += 1
+                match_val := matches[c - '0']
+
+                hand = hand_transition(hand, match_val)
+
+            } else {
+                bet = bet * 10 + u64(c - '0')
+            }
+        case 'T', 'Q', 'K', 'A':
+            num_val := CHAR_MAP[c - 'A']
+            buffer[hand_idx] = num_val
+            hand_idx += 1
+            matches[num_val] += 1
+            match_val := matches[num_val]
+
+            hand = hand_transition(hand, match_val)
+        case 'J':
+            hand_idx += 1 // jokers are value 0 for tie break
+            jokers += 1
+            // save transition till the end
+        case ' ':
+            // card value itself only matters for tie breaking not hand value
+            // but also account for hand of all jokers
+            max_match := slice.max_index(matches[2:]) + 2
+            for _ in 0..<jokers {
+                matches[max_match] += 1
+                match_val := matches[max_match]
+                hand = hand_transition(hand, match_val)
+            }
+
+            hand_val := transmute(u8) Hand{hand}
+            buffer[0] = hand_val
+        case '\n':
+            buf_val := u64(transmute(u64be)buffer)
+
+            append(&all_hands, [2]u64{buf_val, bet})
+            hand_idx = 3
+            matches = {}
+            buffer = {}
+            hand = .High
+            bet = 0
+            jokers = 0
+
+        }
+    }
+
+    slice.sort_by(all_hands[:], proc(p1, p2: [2]u64) -> bool {
+        return p1[0] < p2[0]
+    });
+
+    result: int
+    for hand, i in all_hands {
+        result += (i + 1) * int(hand[1])
+    }
+    return result
 }
 
 main :: proc() {
@@ -82,7 +227,7 @@ part_1_test :: proc(t: ^testing.T) {
 
 @(test)
 part_2_test :: proc(t: ^testing.T) {
-    testing.expect_value(t, part_2(test_input), 1234)
+    testing.expect_value(t, part_2(test_input), 5905)
 }
 
 input := #load("./input.txt", string)
@@ -90,4 +235,6 @@ test_input := `32T3K 765
 T55J5 684
 KK677 28
 KTJJT 220
-QQQJA 483`
+QQQJA 483
+JJJJJ 12345
+`
