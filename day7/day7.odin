@@ -23,7 +23,7 @@ Hand_Type :: enum {
     Five_Kind,
 }
 
-hand_transition :: proc(hand: Hand_Type, match_val: u8) -> (result: Hand_Type) {
+hand_transition :: #force_inline proc(hand: Hand_Type, match_val: u8) -> (result: Hand_Type) {
     result = hand
     switch hand {
     case .High:
@@ -67,18 +67,20 @@ CHAR_MAP_2 := [26]u8 {
     'A' - 'A' = 14,
 }
 
-part_1 :: proc(data: string) -> int {
+bet_mask: u64 = 0xFFFF
 
-    all_hands := make([dynamic][2]u64, 0, 150)
+part_1 :: proc(data: string) -> int {
+    all_hands := make([dynamic]u64, 0, 150)
+
     matches: [15]u8 // map of our current hand
     buffer: [8]u8 // for fun :)
-    hand_idx := 3
-    bet: u64
+    hand_idx := 1
+    bet: u16
     hand: Hand_Type // nil == High
     for c, i in data {
         switch c {
         case '0' ..= '9':
-            if hand_idx < 8 {     // parsing hand still
+            if hand_idx < 6 {     // parsing hand still
                 buffer[hand_idx] = u8(c) - '0'
                 hand_idx += 1
                 matches[c - '0'] += 1
@@ -87,7 +89,7 @@ part_1 :: proc(data: string) -> int {
                 hand = hand_transition(hand, match_val)
 
             } else {
-                bet = bet * 10 + u64(c - '0')
+                bet = bet * 10 + u16(c - '0')
             }
         case 'T', 'J', 'Q', 'K', 'A':
             num_val := CHAR_MAP[c - 'A']
@@ -102,38 +104,41 @@ part_1 :: proc(data: string) -> int {
             buffer[0] = hand_val
         case '\n':
             buf_val := u64(transmute(u64be)buffer)
+            buf_val += u64(bet)
 
-            append(&all_hands, [2]u64{buf_val, bet})
-            hand_idx = 3
+            append(&all_hands, buf_val)
+            hand_idx = 1
             matches = {}
             hand = .High
             bet = 0
 
         }
     }
-    slice.sort_by(all_hands[:], proc(p1, p2: [2]u64) -> bool {
-        return p1[0] < p2[0]
+    slice.sort_by(all_hands[:], proc(p1, p2: u64) -> bool {
+        return (p1 & ~bet_mask) < (p2 & ~bet_mask)
     });
 
     result: int
     for hand, i in all_hands {
-        result += (i + 1) * int(hand[1])
+        result += (i + 1) * int(hand & bet_mask)
     }
     return result
 }
 
 part_2 :: proc(data: string) -> int {
-    all_hands := make([dynamic][2]u64, 0, 150)
+    all_hands := make([dynamic]u64, 0, 150)
+
+    // all_hands := make([dynamic][2]u64, 0, 150)
     matches: [15]u8 // map of our current hand
     buffer: [8]u8 // for fun :)
-    hand_idx := 3
-    bet: u64
+    hand_idx := 1
+    bet: u16
     hand: Hand_Type // nil == High
     jokers: int
     for c, i in data {
         switch c {
         case '0' ..= '9':
-            if hand_idx < 8 {     // parsing hand still
+            if hand_idx < 6 {     // parsing hand still
                 buffer[hand_idx] = u8(c) - '0'
                 hand_idx += 1
                 matches[c - '0'] += 1
@@ -142,7 +147,7 @@ part_2 :: proc(data: string) -> int {
                 hand = hand_transition(hand, match_val)
 
             } else {
-                bet = bet * 10 + u64(c - '0')
+                bet = bet * 10 + u16(c - '0')
             }
         case 'T', 'Q', 'K', 'A':
             num_val := CHAR_MAP[c - 'A']
@@ -153,6 +158,7 @@ part_2 :: proc(data: string) -> int {
 
             hand = hand_transition(hand, match_val)
         case 'J':
+            buffer[hand_idx] = 0
             hand_idx += 1 // jokers are value 0 for tie break
             jokers += 1
             // save transition till the end
@@ -170,11 +176,11 @@ part_2 :: proc(data: string) -> int {
             buffer[0] = hand_val
         case '\n':
             buf_val := u64(transmute(u64be)buffer)
+            buf_val += u64(bet)
 
-            append(&all_hands, [2]u64{buf_val, bet})
-            hand_idx = 3
+            append(&all_hands, buf_val)
+            hand_idx = 1
             matches = {}
-            buffer = {}
             hand = .High
             bet = 0
             jokers = 0
@@ -182,13 +188,13 @@ part_2 :: proc(data: string) -> int {
         }
     }
 
-    slice.sort_by(all_hands[:], proc(p1, p2: [2]u64) -> bool {
-        return p1[0] < p2[0]
+    slice.sort_by(all_hands[:], proc(p1, p2: u64) -> bool {
+        return (p1 & ~(bet_mask)) < (p2 & ~(bet_mask))
     });
 
     result: int
     for hand, i in all_hands {
-        result += (i + 1) * int(hand[1])
+        result += (i + 1) * int(hand & bet_mask)
     }
     return result
 }
@@ -198,22 +204,30 @@ main :: proc() {
     solution_arena: mem.Arena
     mem.arena_init(&solution_arena, arena_backing)
 
-    alloc := mem.arena_allocator(&solution_arena)
-    context.allocator = alloc
-    context.temp_allocator = alloc
+    // alloc := mem.arena_allocator(&solution_arena)
+    // context.allocator = alloc
+    // context.temp_allocator = alloc
+
+    iter := 10000
 
     pt1_start := time.now()
     pt1_ans := part_1(input)
+    for i in 0..<iter {
+        pt1_ans = part_1(input)
+    }
     pt1_end := time.now()
-    fmt.println("P1:", pt1_ans, "Time:", time.diff(pt1_start, pt1_end), "Memory Used:", solution_arena.peak_used)
+    fmt.println("P1:", pt1_ans, "Time:", time.duration_microseconds(time.diff(pt1_start, pt1_end)) / f64(iter), "Memory Used:", solution_arena.peak_used)
 
-    free_all(context.allocator)
-    solution_arena.peak_used = 0
+    // free_all(context.allocator)
+    // solution_arena.peak_used = 0
 
     pt2_start := time.now()
     pt2_ans := part_2(input)
+    for i in 0..<iter {
+        pt2_ans = part_2(input)
+    }
     pt2_end := time.now()
-    fmt.println("P2:", pt2_ans, "Time:", time.diff(pt2_start, pt2_end), "Memory Used:", solution_arena.peak_used)
+    fmt.println("P2:", pt2_ans, "Time:", time.duration_microseconds(time.diff(pt2_start, pt2_end)) / f64(iter), "Memory Used:", solution_arena.peak_used)
 
     free_all(context.allocator)
     solution_arena.peak_used = 0
