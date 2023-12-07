@@ -214,7 +214,7 @@ part_2 :: proc(data: string) -> int {
     return result
 }
 
-fast_hands := make([dynamic]u64, 0, 1000)
+fast_hands: [Hand_Type][dynamic]u64
 
 Parse_State :: enum {
     Hand,
@@ -222,7 +222,9 @@ Parse_State :: enum {
 }
 
 super_speedy_part_2 :: proc(data: string) -> int {
-    clear(&fast_hands)
+    for &hand in fast_hands {
+        clear(&hand)
+    }
 
     // all_hands := make([dynamic][2]u64, 0, 150)
     matches: [15]u8 // map of our current hand
@@ -332,7 +334,7 @@ super_speedy_part_2 :: proc(data: string) -> int {
             buf_val := u64(transmute(u64be)buffer)
             buf_val += u64(bet)
 
-            append(&fast_hands, buf_val)
+            append(&fast_hands[hand], buf_val)
 
             i += j + 1
             state = .Hand
@@ -343,14 +345,21 @@ super_speedy_part_2 :: proc(data: string) -> int {
         }
     }
 
-    slice.sort_by(fast_hands[:], proc(p1, p2: u64) -> bool {
-        return (p1 & ~(bet_mask)) < (p2 & ~(bet_mask))
-    });
+    for &hand in fast_hands {
+        slice.sort_by(hand[:], proc(p1, p2: u64) -> bool {
+            return (p1 & ~(bet_mask)) < (p2 & ~(bet_mask))
+        });
+    }
 
     result: int
-    for hand, i in fast_hands {
-        result += (i + 1) * int(hand & bet_mask)
+    count := 1
+    for &hand in fast_hands {
+        for score in hand {
+            result += count * int(score & bet_mask)
+            count += 1
+        }
     }
+
     return result
 }
 
@@ -386,6 +395,10 @@ main :: proc() {
 
     free_all(context.allocator)
     solution_arena.peak_used = 0
+
+    for &hand in fast_hands {
+        hand = make([dynamic]u64, 0, 1000)
+    }
 
     spt2_start := time.now()
     spt2_ans := part_2(input)
