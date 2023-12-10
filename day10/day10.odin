@@ -154,6 +154,21 @@ part_2 :: proc(data: string) -> int {
     }
     ba.set(pipe_map, fwd_idx)
 
+    /*
+
+    In case anyone sees this monstrosity:
+    the idea is we traverse the pipe again in one direction this time.
+    At every point on the pipe we flood-fill on the port and starboard side
+    of the line. At the end, because we have an empty border around the input,
+    exactly one of our two "visited" boards will have visited (0, 0) as the
+    other was inside the loop
+
+    Discard the "outside" bit array and then count all the visited spots on the "inside" array
+
+    I was sleepy and couldnt think of a good way to determine direction of travel so its all
+    offsets between previous location, now, and next location
+    */
+
     fwd_idx, fwd_prev = sfwd, s_idx
     for fwd_idx != s_idx {
         enter_offset := fwd_idx - fwd_prev
