@@ -104,10 +104,21 @@ part_2 :: proc(data: string) -> (result: int) {
         xspansions[i] = xspansion
     }
 
-
     for g, i in galaxies {
         for j in i..<len(galaxies) {
             g2 := galaxies[j]
+
+            // this is 3-4x faster in Odin right now vs the commented
+            // out code which is what I wanted to write
+            result += (
+                abs(g % grid_width - g2 % grid_width) +
+                abs(g / grid_width - g2 / grid_width) +
+                abs(yspansions[g2 / grid_width] - yspansions[g / grid_width]) +
+                abs(xspansions[g2 % grid_width] - xspansions[g % grid_width])
+            )
+            
+
+            /*
             g1coords := [2]int{g % grid_width, g / grid_width}
             g2coords := [2]int{g2 % grid_width, g2 / grid_width}
             diff := g2coords - g1coords
@@ -118,6 +129,8 @@ part_2 :: proc(data: string) -> (result: int) {
             distance := (abs(diff.x) + abs(diff.y)) + (yspansion_diff + xspansion_diff)
 
             result += distance
+            */
+            
         }
     }
 
@@ -129,6 +142,7 @@ main :: proc() {
     solution_arena: mem.Arena
     mem.arena_init(&solution_arena, arena_backing)
 
+    old_alloc := context.allocator
     alloc := mem.arena_allocator(&solution_arena)
     context.allocator = alloc
     context.temp_allocator = alloc
@@ -141,10 +155,17 @@ main :: proc() {
     free_all(context.allocator)
     solution_arena.peak_used = 0
 
+    // since we're running 10k iters and don't
+    // want to include freeing the arena
+    context.allocator = old_alloc
+
     pt2_start := time.now()
     pt2_ans := part_2(input)
+    for i in 0..<10000 {
+        pt2_ans = part_2(input)
+    }
     pt2_end := time.now()
-    fmt.println("P2:", pt2_ans, "Time:", time.diff(pt2_start, pt2_end), "Memory Used:", solution_arena.peak_used)
+    fmt.println("P2:", pt2_ans, "Time:", time.duration_microseconds(time.diff(pt2_start, pt2_end)) / 10_000.0, "Memory Used:", solution_arena.peak_used)
 
     free_all(context.allocator)
     solution_arena.peak_used = 0
