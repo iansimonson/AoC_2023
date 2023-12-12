@@ -15,31 +15,15 @@ debug_print :: proc(args: ..any) {
     fmt.println(..args)
 }
 
-Range :: struct {
-    start, end: int,
-    min_required_whole: int, // e.g. "#?#" == 2
-    min_required_sub: int, // e.g. "#?#" == 1
-}
-
-rlen :: proc(r: Range) -> int {
-    return r.end - r.start
-}
-
 part_1 :: proc(data: string) -> (result: int) {
     data := data
     sizes := make([dynamic]int, 0, 16)
     for line in strings.split_lines_iterator(&data) {
         line := line
-        // fmt.println(transmute([]u8) line)
-        // fmt.println(line)
         clear(&sizes)
         fields, ok := strings.split_by_byte_iterator(&line, ' ')
         assert(ok)
-        // fmt.println(fields)
         for num in strings.split_by_byte_iterator(&line, ',') {
-            // fmt.println(transmute([]u8)num)
-            // x := strconv.atoi(num)
-            // fmt.println(x)
             append(&sizes, strconv.atoi(num))
         }
 
@@ -55,6 +39,9 @@ part_1 :: proc(data: string) -> (result: int) {
     return
 }
 
+// Checks if the size of the run of springs
+// can fit into the current set of fields
+// either by overlaying #s or ?s
 fits :: proc(fields: []u8, size: int) -> bool {
     if len(fields) < size do return false
 
@@ -65,98 +52,6 @@ fits :: proc(fields: []u8, size: int) -> bool {
     if size < len(fields) && fields[size] == '#' do return false
 
     return true
-}
-
-State :: struct {
-    fptr, sptr: uintptr,
-    fsize, ssize: int,
-}
-
-cache: map[State]int
-
-to_state :: proc(f: []u8, s: []int) -> State {
-    return {uintptr(raw_data(f)), uintptr(raw_data(s)), len(f), len(s)}
-}
-
-cached_count_matches :: proc(fields: []u8, sizes: []int) -> int {
-    S := to_state(fields, sizes)
-    if result, exists := cache[S];exists {
-        return result
-    }
-
-    result: int
-
-    if len(fields) == 0 {
-        debug_print("NO FIELDS")
-        if len(sizes) != 0 {
-            debug_print("sizes left, no match")
-            cache[S] = 0
-            return 0 // no valid matches here, invalidate above
-        }
-        else {
-            debug_print("matched end")
-            cache[S] = 1
-            return 1
-        } 
-    } else if len(sizes) == 0 {
-        debug_print("NO SIZES")
-        for c in fields {
-            if c == '#' { 
-                debug_print("DID NOT CONSUME ALL")
-                cache[S] = 0
-                return 0 // we haven't consumed all the #s
-            }
-        }
-        debug_print("CONSUMED ALL")
-        cache[S] = 1
-        return 1
-    }
-
-    f_len := len(fields)
-    for i in 0..<f_len {
-        c := fields[i]
-        rest := fields[i:]
-        
-        debug_print("CHECKING:", string(rest), sizes)
-        if len(rest) < sizes[0] {
-            debug_print("NOT ENOUGH SIZE")
-            break
-        }
-
-        if c == '?' && fits(rest, sizes[0]) {
-            debug_print("FITS ?")
-            if len(rest) < sizes[0] + 1 {
-                if len(sizes) == 1 {
-                    debug_print("At the end of fields and sizes this is a match!!")
-                    result += 1
-                } else {
-                    debug_print("At the end of fields but no match")
-                }
-            } else {
-                result += cached_count_matches(rest[sizes[0] + 1:], sizes[1:])
-            }
-        } else if c == '#' {
-            if fits(rest, sizes[0]) {
-                debug_print("FITS # - breaking after this")
-                if len(rest) < sizes[0] + 1 {
-                    if len(sizes) == 1 {
-                        debug_print("At the end of fields and sizes this is a match!!")
-                        result += 1
-                    } else {
-                        debug_print("At the end of fields but no match")
-                    }
-                } else {
-                    result += cached_count_matches(rest[sizes[0] + 1:], sizes[1:])
-                }
-            }
-            debug_print("CANT SATISFY REQS ANYMORE")
-            break // we hit a required # so we _have_ to match the current value or just not
-        }
-    }
-
-    cache[S] = result
-
-    return result
 }
 
 count_matches :: proc(fields: []u8, sizes: []int) -> (result: int) {
@@ -269,6 +164,81 @@ part_2 :: proc(data: string) -> (result: int) {
     }
 
     return
+}
+
+State :: struct {
+    fptr, sptr: uintptr,
+    fsize, ssize: int,
+}
+
+cache: map[State]int
+
+to_state :: proc(f: []u8, s: []int) -> State {
+    return {uintptr(raw_data(f)), uintptr(raw_data(s)), len(f), len(s)}
+}
+
+cached_count_matches :: proc(fields: []u8, sizes: []int) -> int {
+    S := to_state(fields, sizes)
+    if result, exists := cache[S];exists {
+        return result
+    }
+
+    result: int
+
+    if len(fields) == 0 {
+        if len(sizes) != 0 {
+            cache[S] = 0
+            return 0 // no valid matches here, invalidate above
+        }
+        else {
+            cache[S] = 1
+            return 1
+        } 
+    } else if len(sizes) == 0 {
+        for c in fields {
+            if c == '#' { 
+                cache[S] = 0
+                return 0 // we haven't consumed all the #s
+            }
+        }
+        cache[S] = 1
+        return 1
+    }
+
+    f_len := len(fields)
+    for i in 0..<f_len {
+        c := fields[i]
+        rest := fields[i:]
+        
+        if len(rest) < sizes[0] {
+            break
+        }
+
+        if c == '?' && fits(rest, sizes[0]) {
+            if len(rest) < sizes[0] + 1 {
+                if len(sizes) == 1 {
+                    result += 1
+                }
+            } else {
+                result += cached_count_matches(rest[sizes[0] + 1:], sizes[1:])
+            }
+        } else if c == '#' {
+            if fits(rest, sizes[0]) {
+                if len(rest) < sizes[0] + 1 {
+                    if len(sizes) == 1 {
+                        result += 1
+                    }
+                } else {
+                    result += cached_count_matches(rest[sizes[0] + 1:], sizes[1:])
+                }
+            }
+            break // we hit a required # so we _have_ to match the current value or just not
+        }
+    }
+
+    cache[S] = result
+
+    return result
 }
 
 main :: proc() {
