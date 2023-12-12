@@ -39,21 +39,10 @@ part_1 :: proc(data: string) -> (result: int) {
     return
 }
 
-// Checks if the size of the run of springs
-// can fit into the current set of fields
-// either by overlaying #s or ?s
-fits :: proc(fields: []u8, size: int) -> bool {
-    if len(fields) < size do return false
-
-    for i in 0..<size {
-        if fields[i] == '.' do return false
-    }
-
-    if size < len(fields) && fields[size] == '#' do return false
-
-    return true
-}
-
+/* this is ugly because of the debug prints
+ go look at cached_count_matches
+ which has more clear commentary
+ */
 count_matches :: proc(fields: []u8, sizes: []int) -> (result: int) {
     
     debug_print("LOOKING AT:", string(fields), sizes)
@@ -123,6 +112,10 @@ count_matches :: proc(fields: []u8, sizes: []int) -> (result: int) {
     return
 }
 
+/*
+Part 2 is basically part 1 with a cache
+*/
+
 part_2 :: proc(data: string) -> (result: int) {
     data := data
     five_sizes := make([dynamic]int, 0, 16)
@@ -177,6 +170,50 @@ to_state :: proc(f: []u8, s: []int) -> State {
     return {uintptr(raw_data(f)), uintptr(raw_data(s)), len(f), len(s)}
 }
 
+// Checks if the size of the run of springs
+// can fit into the current set of fields
+// WITHOUT violating the rules
+// either by overlaying #s or ?s
+// e.g. #????..### can fit any size up to 5
+// # can only fit 1 (and is the end of input)
+// ##. _can't_ fit 1 because there'd be no spacing
+// between the ##s so the minimum size is 2
+fits :: proc(fields: []u8, size: int) -> bool {
+    if len(fields) < size do return false
+
+    for i in 0..<size {
+        if fields[i] == '.' do return false
+    }
+
+    if size < len(fields) && fields[size] == '#' do return false
+
+    return true
+}
+
+/*
+
+Here we recursively consume the next size run we're looking for
+And check for any constraint violations
+
+If we hit a ? we just do the same thing but iterate and consume again
+until we hit either a # or a .
+
+If we hit a # then we _have_ to be able to consume the next size now
+or we're at a violation (0 matches) b/c we can't have broken springs
+that aren't part of the list of sizes
+
+For part 2 this would blow up, so instead we need to cache the calculations
+similar to adding a cache for the fibbonaci number series
+
+Since we _know_ we're just looking at two lists the entire time,
+fields - a subslice of the whole set of fields, and sizes - the sub slice
+of all the sizes we're looking for, the pointer value and size will be unique
+so we can cache the result using those
+
+Really the pointer values alone would be fine because the slices always
+go to the end of the large slice, so the sizes are redundant, but whatever
+*/
+
 cached_count_matches :: proc(fields: []u8, sizes: []int) -> int {
     S := to_state(fields, sizes)
     if result, exists := cache[S];exists {
@@ -186,15 +223,39 @@ cached_count_matches :: proc(fields: []u8, sizes: []int) -> int {
     result: int
 
     if len(fields) == 0 {
+        /* 
+        Here we've run out of fields to check (end of input)
+        but if we still have sizes to check then we haven't fullfilled
+        the constraints of the puzzle because every size has to have a match
+        in the input e.g. you _can't_ have (by definition) ##.# 2
+        you would instead always have ##.# 2,1
+        */
         if len(sizes) != 0 {
             cache[S] = 0
             return 0 // no valid matches here, invalidate above
         }
         else {
+        /* BUT if we don't have any sizes then we've matched everything! YAY!
+        this is exactly 1 arrangement that matched based on the consumed input
+        and how we consumed previous input
+
+        There might be others that satisfy the requirements but this one is ours
+        */
             cache[S] = 1
             return 1
         } 
     } else if len(sizes) == 0 {
+        /*
+        If we still have input but we're out of sizes then one of two things is happening:
+        A: the rest of our input is some combination of '.' and '?' e.g. ..?????
+        in which case we can treat the ? as '.' and we're still ok, no more springs to match
+
+        B: the input has some number of '#' like '..??..###' and we're in a violation
+        because we have # in the input but no springs in the sizes
+
+        Scan the rest of the input and if there is a '#' we're in violation and not matching
+        otherwise WE FOUND AN ARRANGEMENT!
+        */
         for c in fields {
             if c == '#' { 
                 cache[S] = 0
@@ -204,6 +265,21 @@ cached_count_matches :: proc(fields: []u8, sizes: []int) -> int {
         cache[S] = 1
         return 1
     }
+
+
+    /*
+
+        Here, if the input had no '?'s we'd really just want to skip to the next
+        '#' and then verify we're ok by consuming the next size
+
+        However there are ?s so we skip '.'s until either we see a ? or a #
+        If we see a # then two things are possible:
+        A. we can consume our next size _now_ and get 1 or more possible arrangements OR
+        B. we can't consume now and we're in violation b/c we can't skip a # ever (otherwise there'd be another 1 in our size input)
+
+        If we see a ? then we can pretend it's a # and consume like above, but if we get
+        no matches then we can just pretend it was a . and move on
+    */
 
     f_len := len(fields)
     for i in 0..<f_len {
