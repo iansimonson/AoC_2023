@@ -9,6 +9,7 @@ import "core:strconv"
 import "core:strings"
 import "core:testing"
 import "core:time"
+import "core:thread"
 
 @(disabled = !(ODIN_DEBUG || ODIN_TEST))
 debug_print :: proc(args: ..any) {
@@ -317,12 +318,154 @@ cached_count_matches :: proc(fields: []u8, sizes: []int) -> int {
     return result
 }
 
+@(thread_local)
+tcache: map[State]int
+
+results: []int
+
+part_3 :: proc(data: string) -> int {
+    p3_threaded :: proc(t: ^thread.Thread) {
+        line_len := int(uintptr(t.data))
+        line_ptr := cast([^]string) t.user_args[0]
+        idx := t.user_index
+
+        lines := line_ptr[:line_len]
+
+        result: int
+        five_sizes := make([dynamic]int, 0, 16)
+        sizes := make([dynamic]int, 0, 16)
+        five_fields := make([dynamic]u8, 0, 16)
+        for line in lines {
+            line := line
+            clear(&sizes)
+            clear(&five_fields)
+            clear(&five_sizes)
+            clear(&tcache)
+
+            fields_str, ok := strings.split_by_byte_iterator(&line, ' ')
+            fields := transmute([]u8) fields_str
+            assert(ok)
+            for num in strings.split_by_byte_iterator(&line, ',') {
+                append(&sizes, strconv.atoi(num))
+            }
+
+            for i in 0..<5 {
+                append(&five_fields, ..fields[:])
+                append(&five_sizes, ..sizes[:])
+                if i < 4 {
+                    append(&five_fields, '?')
+                }
+            }
+
+            sizes_left := five_sizes[:]
+            fields_left := five_fields[:]
+
+            debug_print(string(five_fields[:]), five_sizes[:])
+            matched := tcached_count_matches(fields_left, sizes_left)
+            if matched == 0 {
+                fmt.panicf("AHH: %s, %v", fields_left, sizes_left)
+            }
+            result += matched
+        }
+        results[idx] = result
+    }
+
+    lines := strings.split_lines(data)
+
+    ts := make([]^thread.Thread, 8)
+    results = make([]int, 8)
+    chunk_len := len(lines) / len(ts)
+    for &t, i in ts {
+        t = thread.create(p3_threaded)
+        chunk := lines[i * chunk_len:]
+        t.data = rawptr(uintptr(min(len(chunk), chunk_len)))
+        t.user_index = i
+        t.user_args[0] = raw_data(lines[i * chunk_len:])
+    }
+
+    for t in ts {
+        thread.start(t)
+    }
+
+    thread.join_multiple(..ts)
+
+    return math.sum(results)
+}
+
+tcached_count_matches :: proc(fields: []u8, sizes: []int) -> int {
+    S := to_state(fields, sizes)
+    if result, exists := tcache[S];exists {
+        return result
+    }
+
+    result: int
+
+    if len(fields) == 0 {
+
+        if len(sizes) != 0 {
+            tcache[S] = 0
+            return 0 // no valid matches here, invalidate above
+        }
+        else {
+
+            tcache[S] = 1
+            return 1
+        } 
+    } else if len(sizes) == 0 {
+
+        for c in fields {
+            if c == '#' { 
+                tcache[S] = 0
+                return 0 // we haven't consumed all the #s
+            }
+        }
+        tcache[S] = 1
+        return 1
+    }
+
+    f_len := len(fields)
+    for i in 0..<f_len {
+        c := fields[i]
+        rest := fields[i:]
+        
+        if len(rest) < sizes[0] {
+            break
+        }
+
+        if c == '?' && fits(rest, sizes[0]) {
+            if len(rest) < sizes[0] + 1 {
+                if len(sizes) == 1 {
+                    result += 1
+                }
+            } else {
+                result += tcached_count_matches(rest[sizes[0] + 1:], sizes[1:])
+            }
+        } else if c == '#' {
+            if fits(rest, sizes[0]) {
+                if len(rest) < sizes[0] + 1 {
+                    if len(sizes) == 1 {
+                        result += 1
+                    }
+                } else {
+                    result += tcached_count_matches(rest[sizes[0] + 1:], sizes[1:])
+                }
+            }
+            break // we hit a required # so we _have_ to match the current value or just not
+        }
+    }
+
+    tcache[S] = result
+
+    return result
+}
+
 main :: proc() {
     arena_backing := make([]u8, 8 * mem.Megabyte)
     solution_arena: mem.Arena
     mem.arena_init(&solution_arena, arena_backing)
 
     alloc := mem.arena_allocator(&solution_arena)
+    old_alloc := context.allocator
     context.allocator = alloc
     context.temp_allocator = alloc
 
@@ -341,6 +484,12 @@ main :: proc() {
 
     free_all(context.allocator)
     solution_arena.peak_used = 0
+
+    context.allocator = old_alloc
+    pt3_start := time.now()
+    pt3_ans := part_3(input)
+    pt3_end := time.now()
+    fmt.println("P3:", pt3_ans, "Time:", time.diff(pt3_start, pt3_end))
 }
 
 
