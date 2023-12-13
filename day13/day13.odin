@@ -141,8 +141,8 @@ part_2 :: proc(data: string) -> int {
     return 100 * row_accum + col_accum
 }
 
-// Identical to find_mirror except instead of
-// breaking if there's no match, we count
+// More or less the same as find_mirror except
+// instead of breaking if there's no match, we count
 // all the differences in the reflections
 // if at the end there's only 1 difference
 // then that's the smudge and we're done
