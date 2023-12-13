@@ -13,6 +13,55 @@ import "core:intrinsics"
 
 Rocks :: bit_set[0..<32; u32]
 
+part_1 :: proc(data: string) -> (result: int) {
+    data := data
+
+    rows := make([dynamic]Rocks, 0, 15)
+    cols := make([dynamic]Rocks, 0, 15)
+
+    row_accum, col_accum: int
+
+    for grid in strings.split_iterator(&data, "\n\n") {
+        grid := grid
+        clear(&rows)
+        clear(&cols)
+
+        row_idx: int
+        for row in strings.split_lines_iterator(&grid) {
+            append(&rows, Rocks{})
+            for r, i in row {
+                if i >= len(cols) do append(&cols, Rocks{})
+                if r == '#' {
+                    rows[row_idx] += {i}
+                    cols[i] += {row_idx}
+                }
+            }
+            row_idx += 1
+        }
+
+        /*
+            we can actually just add both rows and cols
+            because aoc gave us input that is symmetrical in 
+            one direction. but this is less work (faster) and
+            helped find some bugs
+        */
+
+        rmirr, cmirr: int
+        rmirr = find_mirror(rows[:])
+
+        if rmirr != 0 {
+            row_accum += rmirr
+        } else {
+            cmirr = find_mirror(cols[:])
+            col_accum += cmirr
+        }
+
+        assert((rmirr != 0) !=  (cmirr != 0))
+    }
+
+    return 100 * row_accum + col_accum
+}
+
 find_mirror :: proc(rocks: []Rocks) -> int {
     check_rows: for i in 0..<len(rocks) - 1 {
         lhs, rhs := rocks[:i + 1], rocks[i + 1:]
@@ -36,48 +85,6 @@ find_mirror :: proc(rocks: []Rocks) -> int {
     return 0
 }
 
-part_1 :: proc(data: string) -> (result: int) {
-    data := data
-
-    rows := make([dynamic]Rocks, 0, 15)
-    cols := make([dynamic]Rocks, 0, 15)
-
-    row_accum, col_accum: int
-
-    grids: for grid in strings.split_iterator(&data, "\n\n") {
-        grid := grid
-        clear(&rows)
-        clear(&cols)
-
-        row_idx: int
-        for row in strings.split_lines_iterator(&grid) {
-            append(&rows, Rocks{})
-            for r, i in row {
-                if i >= len(cols) do append(&cols, Rocks{})
-                if r == '#' {
-                    rows[row_idx] += {i}
-                    cols[i] += {row_idx}
-                }
-            }
-            row_idx += 1
-        }
-
-        rmirr, cmirr: int
-        rmirr = find_mirror(rows[:])
-
-        if rmirr != 0 {
-            row_accum += rmirr
-        } else {
-            cmirr = find_mirror(cols[:])
-            col_accum += cmirr
-        }
-
-        assert((rmirr != 0) !=  (cmirr != 0))
-    }
-
-    return 100 * row_accum + col_accum
-}
-
 part_2 :: proc(data: string) -> int {
     data := data
 
@@ -86,7 +93,7 @@ part_2 :: proc(data: string) -> int {
 
     row_accum, col_accum: int
 
-    grids: for grid in strings.split_iterator(&data, "\n\n") {
+    for grid in strings.split_iterator(&data, "\n\n") {
         grid := grid
         clear(&rows)
         clear(&cols)
@@ -103,6 +110,7 @@ part_2 :: proc(data: string) -> int {
             }
             row_idx += 1
         }
+
 
         rmirr, cmirr: int
         rmirr = find_mirror_smudge(rows[:])
@@ -121,7 +129,7 @@ part_2 :: proc(data: string) -> int {
 }
 
 find_mirror_smudge :: proc(rocks: []Rocks) -> int {
-    check_rows: for i in 0..<len(rocks) - 1 {
+    for i in 0..<len(rocks) - 1 {
         lhs, rhs := rocks[:i + 1], rocks[i + 1:]
         if len(lhs) > len(rhs) {
             diff := len(lhs) - len(rhs)
