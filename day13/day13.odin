@@ -42,8 +42,9 @@ part_1 :: proc(data: string) -> (result: int) {
         /*
             we can actually just add both rows and cols
             because aoc gave us input that is symmetrical in 
-            one direction. but this is less work (faster) and
-            helped find some bugs
+            one direction (i.e. the result of find_mirror in the other
+            direction would be 0). 
+            but this is less work (faster) and helped find some bugs
         */
 
         rmirr, cmirr: int
@@ -64,7 +65,16 @@ part_1 :: proc(data: string) -> (result: int) {
 
 find_mirror :: proc(rocks: []Rocks) -> int {
     check_rows: for i in 0..<len(rocks) - 1 {
+        
+        // I kept having off by 1 / index bugs
+        // so simplest thing - split the rocks slice
+        // into the two equal slices we're going to look at
+        // i + 1 b/c mirror is between i and i+1 index
         lhs, rhs := rocks[:i + 1], rocks[i + 1:]
+
+        // from the problem description we can drop
+        // rows/cols that don't have a matching partner
+        // due to e.g. 4 rows above and 3 below
         if len(lhs) > len(rhs) {
             diff := len(lhs) - len(rhs)
             lhs = lhs[diff:]
@@ -73,8 +83,10 @@ find_mirror :: proc(rocks: []Rocks) -> int {
         }
 
         assert(len(lhs) == len(rhs))
+        
+        // the actual check - reverse check lhs and forward check rhs
+        // to ensure they match. there's only one match in each grid
         l := len(lhs)
-    
         for j in 0..<l {
             if lhs[l - 1 - j] != rhs[j] do continue check_rows
         }
@@ -85,6 +97,7 @@ find_mirror :: proc(rocks: []Rocks) -> int {
     return 0
 }
 
+// Identical to pt1 but we call find_mirror_smudge
 part_2 :: proc(data: string) -> int {
     data := data
 
@@ -128,6 +141,13 @@ part_2 :: proc(data: string) -> int {
     return 100 * row_accum + col_accum
 }
 
+// Identical to find_mirror except instead of
+// breaking if there's no match, we count
+// all the differences in the reflections
+// if at the end there's only 1 difference
+// then that's the smudge and we're done
+// since we are using a bitset we can just
+// xor the sets and then count 1s in the u32
 find_mirror_smudge :: proc(rocks: []Rocks) -> int {
     for i in 0..<len(rocks) - 1 {
         lhs, rhs := rocks[:i + 1], rocks[i + 1:]
@@ -141,6 +161,8 @@ find_mirror_smudge :: proc(rocks: []Rocks) -> int {
         assert(len(lhs) == len(rhs))
         l := len(lhs)
     
+        // naming is hard - this is the count
+        // of incorrect reflections (no matches)
         reflections: u32
         for j in 0..<l {
             diffs := lhs[l - 1 - j] ~ rhs[j]
