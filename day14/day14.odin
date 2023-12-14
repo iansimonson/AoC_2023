@@ -49,7 +49,11 @@ in the column a column is now a row and you can do it in one sweep
 you also don't need row_col_data then, just a single int
 
 But honestly given how many grids we have to cache (120+) I don't think
-saving the one extra grid is worth it
+saving the one extra grid is worth it. That being said removing the work
+of filling next with '.' on each rotation would be nice
+
+Whelp replacing current character with '.' as we walk cur_grid
+to remove the need to slice.fill() was _slower_ which...sure
 */
 
 cycle_grid :: proc(grid_width: int, cur, next: []u8, row_col_data: []int) {
@@ -123,18 +127,23 @@ part_2 :: proc(data: string) -> int {
             if slice.simple_equal(current_grid, old_grid) {
                 cycle := cycle_count - i
                 // fmt.println("FOUND CYCLE", cycle_count, i, cycle)
-                for cycle_count < 1000000000 {
-                    cycle_count += cycle
-                }
-                cycle_count -= cycle
+                // for cycle_count < 1000000000 {
+                //     cycle_count += cycle
+                // }
+                // cycle_count -= cycle
 
-                // fmt.println("cycles left:", 1000000000 - cycle_count)
-                assert(1000000000 - cycle_count < cycle)
+                // // fmt.println("cycles left:", 1000000000 - cycle_count)
+                // assert(1000000000 - cycle_count < cycle)
 
-                for cycle_count < 1000000000 {
-                    cycle_grid(grid_width, current_grid, next_grid, row_or_col_info)
-                    cycle_count += 1
-                }
+                // for cycle_count < 1000000000 {
+                //     cycle_grid(grid_width, current_grid, next_grid, row_or_col_info)
+                //     cycle_count += 1
+                // }
+
+
+                // thanks @Matija in discord, I was being dumb and forgot I already had this
+                // grid simulated and didn't need to simulate more
+                current_grid = previous_grids[i + (1000000000 - cycle_count) % cycle]
                 break outer
             }
         }
