@@ -27,13 +27,14 @@ void load_data() {
 void aocloop_bench_init(i64 width) {
     grid_width = width;
     i64 total_size = grid_width * grid_width;
-    big_grid_1 = raw_data;
-    big_grid_2.resize(raw_data.size(), '.');
-    std::fill(row_col_data.begin(), row_col_data.end(), 0);
+    big_grid_1.resize(total_size);
+    std::copy(raw_data.begin(), raw_data.begin() + total_size, big_grid_1.data());
+    big_grid_2.resize(total_size, '.');
+    row_col_data.resize(width, 0);
 }
 
 void aocloop_per_iter_cleanup() {
-    big_grid_1 = raw_data;
+    std::copy(raw_data.begin(), raw_data.begin() + big_grid_1.size(), big_grid_1.data());
     std::fill(big_grid_2.begin(), big_grid_2.end() , '.');
     std::fill(row_col_data.begin(), row_col_data.end() , 0);
 }
@@ -164,7 +165,7 @@ void bench(WorkPtr work) {
 
         aocloop_bench_destroy();
 
-        printf("Width: %d time: %lld ns unused value: %lld", width, total_time.count() / iterations, result);
+        printf("Width: %d time: %lld ns unused value: %lld\n", width, total_time.count() / iterations, result);
     }
 }
 
