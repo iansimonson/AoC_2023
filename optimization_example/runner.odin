@@ -8,7 +8,7 @@ main :: proc() {
 
     bench(aocloop_do_work_1)
     bench(aocloop_do_work_1c)
-    bench(aocloop_do_work_1d)
+    // bench(aocloop_do_work_1d)
     // bench(aocloop_do_work_1b)
     bench(aocloop_do_work_2)
     // bench(aocloop_do_work_3)
