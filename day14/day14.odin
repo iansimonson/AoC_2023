@@ -19,7 +19,7 @@ part_1 :: proc(data: string) -> int {
     column_accumulators := make([]int, newline)
 
 
-    col: int = -1
+    col: int = -11
     row: int
     for c, i in data {
         col += 1
@@ -39,7 +39,6 @@ part_1 :: proc(data: string) -> int {
 
 }
 
-
 /*
 Possible optimization? instead of doing everything towards
 the 0th row and rotating. Rotate the world counterclockwise once
@@ -56,22 +55,47 @@ Whelp replacing current character with '.' as we walk cur_grid
 to remove the need to slice.fill() was _slower_ which...sure
 */
 
-cycle_grid :: proc(grid_width: int, cur, next: []u8, row_col_data: []int) {
+cycle_grid :: proc(do_print_grid: bool, grid_width: int, cur, next: []u8, row_col_data: []int) {
+    if do_print_grid do fmt.println("=========================")
     cur, next := cur, next
+    if do_print_grid {
+        fmt.println("--------------------")
+        print_grid(grid_width, cur)
+    }
     slice.fill(next, '.')
     slide_and_rotate(grid_width, cur, next, row_col_data) // north
 
+    
     cur, next = next, cur
+    if do_print_grid {
+        fmt.println("--------------------")
+        print_grid(grid_width, cur)
+    }
     slice.fill(next, '.')
     slide_and_rotate(grid_width, cur, next, row_col_data) // west
 
     cur, next = next, cur
+    if do_print_grid {
+        fmt.println("--------------------")
+        print_grid(grid_width, cur)
+    }
     slice.fill(next, '.')
     slide_and_rotate(grid_width, cur, next, row_col_data) // south
 
     cur, next = next, cur
+    if do_print_grid {
+        fmt.println("--------------------")
+        print_grid(grid_width, cur)
+    }
     slice.fill(next, '.')
     slide_and_rotate(grid_width, cur, next, row_col_data) // east
+
+    cur, next = next, cur
+    if do_print_grid {
+        fmt.println("--------------------")
+        print_grid(grid_width, cur)
+    }
+    if do_print_grid do fmt.println("=========================")
 }
 
 // prereq: `next` must be empty (filled with '.')
@@ -120,8 +144,20 @@ part_2 :: proc(data: string) -> int {
 
     cycle_count: int
     outer: for cycle_count < 1000000000 {
-        cycle_grid(grid_width, current_grid, next_grid, row_or_col_info)
+        cycle_grid(cycle_count == 9, grid_width, current_grid, next_grid, row_or_col_info)
         cycle_count += 1
+
+        if cycle_count == 10 {
+            load: int
+            for c, i in current_grid {
+                row := i / grid_width
+                switch c {
+                case 'O':
+                    load += lines - row
+                }
+            }
+            fmt.println(load)
+        }
 
         for old_grid, i in previous_grids {
             if slice.simple_equal(current_grid, old_grid) {
