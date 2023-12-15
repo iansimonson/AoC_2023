@@ -6,12 +6,10 @@ import "core:mem"
 
 main :: proc() {
 
-    bench(aocloop_do_work_1)
-    bench(aocloop_do_work_1c)
-    bench(aocloop_do_work_1d)
+    // bench(aocloop_do_work_1)
     // bench(aocloop_do_work_1b)
-    bench(aocloop_do_work_2)
-    // bench(aocloop_do_work_3)
+    // bench(aocloop_do_work_2)
+    bench(aocloop_do_work_3)
 }
 
 bench :: proc(work: proc() -> int) {
@@ -27,7 +25,7 @@ bench :: proc(work: proc() -> int) {
 
     context.allocator = mem.arena_allocator(&arena)
 
-    iterations := 100_000
+    iterations := 1_000_000
 
     for width in widths {
         aocloop_bench_init(width)

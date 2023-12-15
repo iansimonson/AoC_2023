@@ -77,58 +77,6 @@ aocloop_do_work_1b :: proc() -> int {
     return result
 }
 
-aocloop_do_work_1c :: proc() -> int {
-    result: int
-    
-    for c, i in big_grid_1 {
-        switch c {
-        case u8('O'):
-            row := i / grid_width
-            col := i % grid_width
-        
-            slide_to_row := row_col_data[col]
-            next_idx := (col) * grid_width + (grid_width - slide_to_row - 1)
-            big_grid_2[next_idx] = u8('O')
-            row_col_data[col] += 1
-            result += row
-        case u8('#'):
-            row := i / grid_width
-            col := i % grid_width
-        
-            next_idx := (col) * grid_width + (grid_width - (row) - 1)
-            big_grid_2[next_idx] = u8('#')
-            row_col_data[(col)] = (row) + 1
-        } 
-    }
-
-    return result
-}
-
-aocloop_do_work_1d :: proc() -> int {
-    result: int
-    
-    for c, i in big_grid_1 {
-        row := i / grid_width
-        col := i % grid_width
-        
-        slide_to_row := row_col_data[col]
-        switch c {
-        case u8('O'):
-            next_idx := (col) * grid_width + (grid_width - slide_to_row - 1)
-            big_grid_2[next_idx] = u8('O')
-            row_col_data[col] += 1
-            result += row
-        case u8('#'):
-            next_idx := (col) * grid_width + (grid_width - (row) - 1)
-            big_grid_2[next_idx] = u8('#')
-            row_col_data[(col)] = (row) + 1
-        case:
-        } 
-    }
-
-    return result
-}
-
 aocloop_do_work_2 :: proc() -> int {
     result: int
     
