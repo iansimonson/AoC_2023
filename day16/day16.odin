@@ -10,6 +10,17 @@ import "core:strings"
 import "core:testing"
 import "core:time"
 
+/*
+
+The runtime can be cut in half if instead of having two sets,
+one of <idx, dir> and one of <idx> you have a singular map
+<idx> -> <dirs> where <dirs> is a bit_set of the directions
+so you save a lot of memory, can check if you've been in the
+direction before, AND can still just do len(map) as the result
+
+but leaving this version as is since this is what I thought
+*/
+
 part_1 :: proc(data: string) -> int {
     total_size := len(data)
     grid_width := strings.index_byte(data, '\n') + 1
