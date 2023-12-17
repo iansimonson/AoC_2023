@@ -24,25 +24,25 @@ Grid :: struct {
     width, height: int
 }
 
-part_1 :: proc(data: string, sa: ^mem.Arena) -> int {
+part_1 :: proc(data: string) -> int {
     newline_idx := strings.index_byte(data, '\n')
     grid_width := newline_idx + 1
     grid_height := len(data) / grid_width
     grid := Grid{transmute([]u8) data, grid_width, grid_height}
 
-    heat_loss, found := astar_kinda(grid, 0, len(data) - 2, sa)
+    heat_loss, found := astar_kinda(grid, 0, len(data) - 2)
 
     assert(found)
     return heat_loss
 }
 
-part_2 :: proc(data: string, sa: ^mem.Arena) -> int {
+part_2 :: proc(data: string) -> int {
     newline_idx := strings.index_byte(data, '\n')
     grid_width := newline_idx + 1
     grid_height := len(data) / grid_width
     grid := Grid{transmute([]u8) data, grid_width, grid_height}
 
-    heat_loss, found := astar_super_kinda(grid, 0, len(data) - 2, sa)
+    heat_loss, found := astar_super_kinda(grid, 0, len(data) - 2)
 
     assert(found)
     return heat_loss
@@ -66,13 +66,18 @@ Node :: struct {
     steps_in_dir: int,
 }
 
+QueueNode :: struct {
+    node: Node,
+    cost: int,
+}
+
 /*
     From previous AoC days it's much faster
     to do the multiplication of x, y to find the
     index rather than always be doing a `div` to get
     x and y
 */
-astar_kinda :: proc(grid: Grid, start, end: int, sa: ^mem.Arena) -> (heat_loss: int, found: bool) {
+astar_kinda :: proc(grid: Grid, start, end: int) -> (heat_loss: int, found: bool) {
     // a* heuristic - manhattan distance
     // valid b/c heat loss will always be higher
     g :: proc(square, end: [2]i32) -> int {
@@ -163,63 +168,63 @@ astar_kinda :: proc(grid: Grid, start, end: int, sa: ^mem.Arena) -> (heat_loss: 
 }
 
 main :: proc() {
-    arena_backing := make([]u8, 64 * mem.Megabyte)
+    // arena_backing := make([]u8, 64 * mem.Megabyte)
     solution_arena: mem.Arena
-    mem.arena_init(&solution_arena, arena_backing)
+    // mem.arena_init(&solution_arena, arena_backing)
 
-    alloc := mem.arena_allocator(&solution_arena)
-    context.allocator = alloc
-    context.temp_allocator = alloc
+    // alloc := mem.arena_allocator(&solution_arena)
+    // context.allocator = alloc
+    // context.temp_allocator = alloc
 
     pt1_start := time.now()
-    pt1_ans := part_1(input, &solution_arena)
+    pt1_ans := part_1(input)
     pt1_end := time.now()
     fmt.println("P1:", pt1_ans, "Time:", time.diff(pt1_start, pt1_end), "Memory Used:", solution_arena.peak_used)
 
-    free_all(context.allocator)
-    solution_arena.peak_used = 0
+    // free_all(context.allocator)
+    // solution_arena.peak_used = 0
 
     pt2_start := time.now()
-    pt2_ans := part_2(input, &solution_arena)
+    pt2_ans := part_2(input)
     pt2_end := time.now()
     fmt.println("P2:", pt2_ans, "Time:", time.diff(pt2_start, pt2_end), "Memory Used:", solution_arena.peak_used)
 
-    free_all(context.allocator)
-    solution_arena.peak_used = 0
+    // free_all(context.allocator)
+    // solution_arena.peak_used = 0
 }
 
 
 @(test)
 part_1_test :: proc(t: ^testing.T) {
-    arena_backing := make([]u8, 64 * mem.Megabyte)
-    solution_arena: mem.Arena
-    mem.arena_init(&solution_arena, arena_backing)
+    // arena_backing := make([]u8, 64 * mem.Megabyte)
+    // solution_arena: mem.Arena
+    // mem.arena_init(&solution_arena, arena_backing)
 
-    context.allocator = mem.arena_allocator(&solution_arena)
+    // context.allocator = mem.arena_allocator(&solution_arena)
 
-    testing.expect_value(t, part_1(test_input, &solution_arena), 102)
+    testing.expect_value(t, part_1(test_input), 102)
 }
 
 @(test)
 part_2_test :: proc(t: ^testing.T) {
-    arena_backing := make([]u8, 64 * mem.Megabyte)
-    solution_arena: mem.Arena
-    mem.arena_init(&solution_arena, arena_backing)
+    // arena_backing := make([]u8, 64 * mem.Megabyte)
+    // solution_arena: mem.Arena
+    // mem.arena_init(&solution_arena, arena_backing)
 
-    context.allocator = mem.arena_allocator(&solution_arena)
+    // context.allocator = mem.arena_allocator(&solution_arena)
 
-    testing.expect_value(t, part_2(test_input, &solution_arena), 94)
+    testing.expect_value(t, part_2(test_input), 94)
 }
 
 @(test)
 part_2_test_2 :: proc(t: ^testing.T) {
-    arena_backing := make([]u8, 64 * mem.Megabyte)
-    solution_arena: mem.Arena
-    mem.arena_init(&solution_arena, arena_backing)
+    // arena_backing := make([]u8, 64 * mem.Megabyte)
+    // solution_arena: mem.Arena
+    // mem.arena_init(&solution_arena, arena_backing)
 
-    context.allocator = mem.arena_allocator(&solution_arena)
+    // context.allocator = mem.arena_allocator(&solution_arena)
 
-    testing.expect_value(t, part_2(test_input_2, &solution_arena), 71)
+    testing.expect_value(t, part_2(test_input_2), 71)
 }
 
 input := #load("./input.txt", string)
@@ -246,7 +251,7 @@ test_input_2 := `111111111111
 `
 
 
-astar_super_kinda :: proc(grid: Grid, start, end: int, sa: ^mem.Arena) -> (heat_loss: int, found: bool) {
+astar_super_kinda :: proc(grid: Grid, start, end: int) -> (heat_loss: int, found: bool) {
     // a* heuristic - manhattan distance
     // valid b/c heat loss will always be higher
     g :: proc(square, end: [2]i32) -> int {
@@ -284,32 +289,18 @@ astar_super_kinda :: proc(grid: Grid, start, end: int, sa: ^mem.Arena) -> (heat_
     heat_loss_cache[start_node] = right_hl
     heat_loss_cache[start_node_2] = down_hl
 
-    Context :: struct {
-        goal: Pos,
-        hl_cache: ^map[Node]int,
-    }
-    
-    // anonymous procs in odin don't capture so we'll store
-    // the data we need in the user_ptr to use in the priority function
-    ctx := Context{end_pos, &heat_loss_cache}
-    context.user_ptr = &ctx
 
-    queue: pq.Priority_Queue(Node)
-    pq.init(&queue, (proc(a, b: Node) -> bool {
-        ctx := cast(^Context) context.user_ptr
+    queue: pq.Priority_Queue(QueueNode)
+    pq.init(&queue, (proc(a, b: QueueNode) -> bool {
+        return a.cost < b.cost
+    }), pq.default_swap_proc(QueueNode))
 
-        ga := g(a.location, ctx.goal)
-        gb := g(b.location, ctx.goal)
-        cost_a := ctx.hl_cache[a] + ga
-        cost_b := ctx.hl_cache[b] + gb
-        return cost_a < cost_b
-    }), pq.default_swap_proc(Node))
-
-    pq.push(&queue, start_node)
-    pq.push(&queue, start_node_2)
+    pq.push(&queue, QueueNode{start_node, g(start_node.location, end_pos) + right_hl})
+    pq.push(&queue, QueueNode{start_node_2, g(start_node_2.location, end_pos) + down_hl})
 
     for pq.len(queue) != 0 {
-        next := pq.pop(&queue)
+        next_node := pq.pop(&queue)
+        next := next_node.node
 
         if next.location == end_pos {
             return heat_loss_cache[next], true
@@ -345,17 +336,33 @@ astar_super_kinda :: proc(grid: Grid, start, end: int, sa: ^mem.Arena) -> (heat_
                 }
                 next_heat = current_heat_loss + added_hl
             }
+            
+            cost := next_heat + g(neighbor.location, end_pos) // fscore in A*
 
             if neighbor_heat, ok := heat_loss_cache[neighbor]; ok {
                 if next_heat < neighbor_heat {
                     heat_loss_cache[neighbor] = next_heat
-                    if !slice.contains(queue.queue[:], neighbor) {
-                        pq.push(&queue, neighbor)
+                    
+                    // either append node, OR we need to update
+                    // the fscore/cost of the node in the queue
+                    found: bool
+                    idx: int
+                    for qn in queue.queue[:] {
+                        if qn.node == neighbor {
+                            found = true
+                            break
+                        }
+                    }
+                    if !found {
+                        pq.push(&queue, QueueNode{neighbor, cost})
+                    } else {
+                        queue.queue[idx].cost = cost
+                        pq.fix(&queue, idx)
                     }
                 }
             } else {
                 heat_loss_cache[neighbor] = next_heat
-                pq.push(&queue, neighbor)
+                pq.push(&queue, QueueNode{neighbor, cost})
             }
         }
     }
