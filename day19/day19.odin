@@ -36,7 +36,7 @@ Workflow :: [8]Instr
 
 MaxLetterVal :: ('z' - 'a' + 1)
 MaxLabel :: MaxLetterVal << 10 | MaxLetterVal << 5 | MaxLetterVal
-IN: int = ('i' - 'a' + 1) << 5 | ('n' - 'a' + 1)
+IN: u16 = ('i' - 'a' + 1) << 5 | ('n' - 'a' + 1)
 
 @(disabled = !(ODIN_DEBUG || ODIN_TEST))
 debug_print :: proc(args: ..any) {
@@ -47,8 +47,8 @@ debug_print :: proc(args: ..any) {
 part_1 :: proc(data: string) -> (result: int) {
     data := data
     
-    workflows: [MaxLabel + 1]Workflow
-    parse_workflows(&data, workflows[:])
+    workflows: map[u16]Workflow
+    parse_workflows(&data, &workflows)
     debug_print(workflows[IN])
 
     for xmas_str in strings.split_lines_iterator(&data) {
@@ -66,7 +66,7 @@ part_1 :: proc(data: string) -> (result: int) {
             idx += 1
         }
 
-        if run_workflows(workflows[:], xmas) {
+        if run_workflows(workflows, xmas) {
             result += math.sum(xmas[:])
         }
     }
@@ -76,16 +76,12 @@ part_1 :: proc(data: string) -> (result: int) {
 }
 
 part_2 :: proc(data: string) -> (result: int) {
-    data := data
-    
-    workflows: [MaxLabel + 1]Workflow
-    parse_workflows(&data, workflows[:])
 
     return 0
 }
 
 // qs{s>3448:A,lnx} e.g.
-parse_workflows :: proc(data: ^string, workflow_map: []Workflow) {
+parse_workflows :: proc(data: ^string, workflow_map: ^map[u16]Workflow) {
     for line in strings.split_lines_iterator(data) {
         if len(line) == 0 do return
 
@@ -93,9 +89,10 @@ parse_workflows :: proc(data: ^string, workflow_map: []Workflow) {
         debug_print(line)
 
         // parse label
-        label, idx: int
+        label: u16
+        idx: int
         for line[idx] != '{' {
-            label = label << 5 + int(line[idx] - 'a' + 1)
+            label = label << 5 + u16(line[idx] - 'a' + 1)
             idx += 1
         }
         idx += 1
@@ -106,6 +103,9 @@ parse_workflows :: proc(data: ^string, workflow_map: []Workflow) {
         }
 
         // ALWAYS a condition except the last rule
+        if label not_in workflow_map {
+            workflow_map[label] = {}
+        }
         workflow := &workflow_map[label]
         workflow_idx: int
 
@@ -170,8 +170,8 @@ parse_workflows :: proc(data: ^string, workflow_map: []Workflow) {
     }
 }
 
-run_workflows :: proc(workflows: []Workflow, xmas: Xmas) -> bool {
-    cur_flow := IN
+run_workflows :: proc(workflows: map[u16]Workflow, xmas: Xmas) -> bool {
+    cur_flow := u16(IN)
     outer: for {
         workflow := &workflows[cur_flow]
         instr_idx := 0
@@ -185,7 +185,7 @@ run_workflows :: proc(workflows: []Workflow, xmas: Xmas) -> bool {
             case .A:
                 return true
             case .Goto:
-                cur_flow = instr.operand
+                cur_flow = u16(instr.operand)
                 continue outer
             case .Compare_Lt:
                 if xmas[instr.xmas_value] < instr.operand do instr_idx += 1
