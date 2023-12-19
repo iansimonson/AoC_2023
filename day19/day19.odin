@@ -11,15 +11,15 @@ import "core:testing"
 import "core:time"
 import q "core:container/queue"
 
-Xmas :: [4]int
-XMAS_CHAR_MAP := [26]int {
+Xmas :: [4]u16
+XMAS_CHAR_MAP := [26]u8 {
     'x' - 'a' = 0,
     'm' - 'a' = 1,
     'a' - 'a' = 2,
     's' - 'a' = 3,
 }
 
-Op :: enum {
+Op :: enum u8 {
     None,
     Compare_Lt,
     Compare_Gt,
@@ -30,7 +30,8 @@ Op :: enum {
 
 Instr :: struct {
     op: Op,
-    xmas_value, operand: int,
+    xmas_value: u8,
+    operand: u16,
 }
 
 Workflow :: [8]Instr
@@ -61,14 +62,14 @@ part_1 :: proc(data: string) -> (result: int) {
             for xmas_str[i] != '=' do i += 1
             i += 1
             for xmas_str[i] != ',' && xmas_str[i] != '}' {
-                xmas[idx] = xmas[idx] * 10 + int(xmas_str[i] - '0')
+                xmas[idx] = xmas[idx] * 10 + u16(xmas_str[i] - '0')
                 i += 1
             }
             idx += 1
         }
 
         if run_workflows(workflows, xmas) {
-            result += math.sum(xmas[:])
+            result += int(math.sum(xmas[:]))
         }
     }
 
@@ -130,7 +131,7 @@ parse_workflows :: proc(data: ^string, workflow_map: ^map[u16]Workflow) {
                 // parse operand
                 idx += 2
                 for ;line[idx] != ':'; idx += 1 {
-                    instr.operand = instr.operand * 10 + int(line[idx] - '0')
+                    instr.operand = instr.operand * 10 + u16(line[idx] - '0')
                 }
 
                 // parse _then_
@@ -146,7 +147,7 @@ parse_workflows :: proc(data: ^string, workflow_map: ^map[u16]Workflow) {
                 } else {
                     instr.op = .Goto
                     for ;line[idx] != ','; idx += 1 {
-                        instr.operand = instr.operand << 5 + int(line[idx] - 'a' + 1)
+                        instr.operand = instr.operand << 5 + u16(line[idx] - 'a' + 1)
                     }
                 }
                 workflow_idx += 1
@@ -163,7 +164,7 @@ parse_workflows :: proc(data: ^string, workflow_map: ^map[u16]Workflow) {
                 case:
                     instr.op = .Goto
                     for ;line[idx] != ',' && line[idx] != '}'; idx += 1 {
-                        instr.operand = instr.operand << 5 + int(line[idx] - 'a' + 1)
+                        instr.operand = instr.operand << 5 + u16(line[idx] - 'a' + 1)
                     }
                 }
                 assert(line[idx] == ',' || line[idx] == '}')
@@ -210,10 +211,10 @@ run_workflows :: proc(workflows: map[u16]Workflow, xmas: Xmas) -> bool {
 
 Node :: struct {
     label: u16,
-    ranges: [4][2]int,
+    ranges: [4][2]u16,
 }
 
-compute_combos :: proc(ranges: [4][2]int) -> int {
+compute_combos :: proc(ranges: [4][2]u16) -> int {
     combos := 1
     for r in ranges {
         combos *= range_len(r)
@@ -221,13 +222,13 @@ compute_combos :: proc(ranges: [4][2]int) -> int {
     return combos
 }
 
-range_len :: proc(r: [2]int) -> int {
-    return max(0, r[1] - r[0] + 1)
+range_len :: proc(r: [2]u16) -> int {
+    return int(max(0, r[1] - r[0] + 1))
 }
 
 run_theoretical_workflows :: proc(workflows: map[u16]Workflow) -> int {
     queue: q.Queue(Node)
-    q.push(&queue, Node{IN, [4][2]int{{1, 4000}, {1, 4000}, {1, 4000}, {1, 4000}}})
+    q.push(&queue, Node{IN, [4][2]u16{{1, 4000}, {1, 4000}, {1, 4000}, {1, 4000}}})
 
     result: int
 
@@ -262,7 +263,7 @@ run_theoretical_workflows :: proc(workflows: map[u16]Workflow) -> int {
                     then_instr := workflow[instr_idx + 1]
                     new_ranges := ranges
                     new_ranges[instr.xmas_value][1] = min(ranges[instr.xmas_value][1], instr.operand - 1)
-                    remaining_range := [2]int{instr.operand, ranges[instr.xmas_value][1]}
+                    remaining_range := [2]u16{instr.operand, ranges[instr.xmas_value][1]}
                     debug_print("CUT AT LT - new range:", new_ranges)
                     debug_print("remaining_range", remaining_range)
                     debug_print("THEN:", then_instr)
@@ -289,7 +290,7 @@ run_theoretical_workflows :: proc(workflows: map[u16]Workflow) -> int {
                     then_instr := workflow[instr_idx + 1]
                     new_ranges := ranges
                     new_ranges[instr.xmas_value][0] = max(ranges[instr.xmas_value][0], instr.operand + 1)
-                    remaining_range := [2]int{ranges[instr.xmas_value][0], instr.operand}
+                    remaining_range := [2]u16{ranges[instr.xmas_value][0], instr.operand}
                     debug_print("CUT AT GT - new range:", new_ranges)
                     debug_print("remaining_range", remaining_range)
                     debug_print("THEN:", then_instr)
@@ -329,18 +330,32 @@ main :: proc() {
     context.allocator = alloc
     context.temp_allocator = alloc
 
-    pt1_start := time.now()
-    pt1_ans := part_1(input)
-    pt1_end := time.now()
-    fmt.println("P1:", pt1_ans, "Time:", time.diff(pt1_start, pt1_end), "Memory Used:", solution_arena.peak_used)
+    iters := 100_000
+    pt1_ans: int
+    pt1_total_time: time.Duration
+    for i in 0..<iters {
+        pt1_start := time.now()
+        pt1_ans = part_1(input)
+        pt1_end := time.now()
+        pt1_total_time += time.diff(pt1_start, pt1_end)
+        free_all(context.allocator)
+    }
+
+    fmt.println("P1:", pt1_ans, "Time:", pt1_total_time / time.Duration(iters), "Memory Used:", solution_arena.peak_used)
 
     free_all(context.allocator)
     solution_arena.peak_used = 0
 
-    pt2_start := time.now()
-    pt2_ans := part_2(input)
-    pt2_end := time.now()
-    fmt.println("P2:", pt2_ans, "Time:", time.diff(pt2_start, pt2_end), "Memory Used:", solution_arena.peak_used)
+    pt2_ans: int
+    pt2_total_time: time.Duration
+    for i in 0..<iters {
+        pt2_start := time.now()
+        pt2_ans = part_1(input)
+        pt2_end := time.now()
+        pt2_total_time += time.diff(pt2_start, pt2_end)
+        free_all(context.allocator)
+    }
+    fmt.println("P2:", pt2_ans, "Time:", pt2_total_time / time.Duration(iters), "Memory Used:", solution_arena.peak_used)
 
     free_all(context.allocator)
     solution_arena.peak_used = 0
