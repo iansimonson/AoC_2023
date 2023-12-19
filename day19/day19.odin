@@ -225,122 +225,89 @@ range_len :: proc(r: [2]int) -> int {
     return max(0, r[1] - r[0] + 1)
 }
 
-add_range :: proc(ranges: ^[dynamic][2]int, range: [2]int) {
-    if len(ranges) == 0 {
-        append(ranges, range)
-        return
-    }
-
-    idx: int
-    for idx < len(ranges) && range[0] > ranges[idx][1] do idx += 1
-    if idx == len(ranges) {
-        append(ranges, range)
-        return
-    }
-
-    // no overlap
-    if range[1] < ranges[idx][0] {
-        inject_at(ranges, idx, range)
-    }
-
-    // some overlap
-    new_range := [2]int{min(range[0], ranges[idx][0]), max(range[1], ranges[idx][1])}
-    ranges[idx] = new_range
-    for i := idx + 1; i < len(ranges); {
-        if ranges[i][0] <= new_range[1] || ranges[i][1] >= new_range[0] {
-            new_range = [2]int{min(ranges[i][0], new_range[0]), max(ranges[i][1], new_range[1])}
-            ordered_remove(ranges, i)
-        } else {
-            i += 1
-        }
-    }
-}
-
-add_all_ranges :: proc(all_ranges: [][dynamic][2]int, new_ranges: [][2]int) {
-    for i in 0..<len(new_ranges) {
-        debug_print("ranges before:", all_ranges[i], "new:", new_ranges[i])
-        add_range(&all_ranges[i], new_ranges[i])
-        debug_print("ranges after:", all_ranges[i])
-    }
-}
-
 run_theoretical_workflows :: proc(workflows: map[u16]Workflow) -> int {
     queue: q.Queue(Node)
     q.push(&queue, Node{IN, [4][2]int{{1, 4000}, {1, 4000}, {1, 4000}, {1, 4000}}})
 
-    xmas_ranges: [4][dynamic][2]int
+    result: int
 
     outer: for q.len(queue) != 0 {
         node := q.pop_front(&queue)
 
         workflow := &workflows[node.label]
+        ranges := node.ranges
         // debug_print(node.label, workflow)
         instr_idx: int
         for {
             instr := workflow[instr_idx]
             debug_print(node.label, instr)
-            debug_print(node.label, node.ranges)
+            debug_print(node.label, ranges)
             switch instr.op {
             case .R:
                 continue outer
             case .A:
-                debug_print("Adding combos for:", node.ranges)
-                add_all_ranges(xmas_ranges[:], node.ranges[:])
+                debug_print("Adding combos for:", ranges)
+                // add_all_ranges(xmas_ranges[:], ranges[:])
+                result += compute_combos(ranges)
                 continue outer
             case .Goto:
-                q.push_back(&queue, Node{u16(instr.operand), node.ranges})
+                q.push_back(&queue, Node{u16(instr.operand), ranges})
                 continue outer
             case .Compare_Lt:
                 if instr.operand <= node.ranges[instr.xmas_value][0] {
-                    instr_idx += 2
+                    // range is now zero size, continue
+                    continue outer
                 } else {
+                    // we either have everything, or a subset in the LT case
                     then_instr := workflow[instr_idx + 1]
-                    ranges := node.ranges
-                    ranges[instr.xmas_value][1] = min(ranges[instr.xmas_value][1], instr.operand - 1)
-                    if range_len(ranges[instr.xmas_value]) == 0 {
-                        instr_idx += 2
-                        continue
-                    }
-                    debug_print("CUT AT LT - new range:", ranges)
+                    new_ranges := ranges
+                    new_ranges[instr.xmas_value][1] = min(ranges[instr.xmas_value][1], instr.operand - 1)
+                    remaining_range := [2]int{instr.operand, ranges[instr.xmas_value][1]}
+                    debug_print("CUT AT LT - new range:", new_ranges)
+                    debug_print("remaining_range", remaining_range)
                     debug_print("THEN:", then_instr)
                     #partial switch then_instr.op {
                     case .R:
                         // nothing
                     case .A:
                         debug_print("Adding combos for:", ranges)
-                        add_all_ranges(xmas_ranges[:], ranges[:])
+                        // add_all_ranges(xmas_ranges[:], new_ranges[:])
+                        result += compute_combos(new_ranges)
                     case .Goto:
-                        q.push_back(&queue, Node{u16(then_instr.operand), ranges})
+                        q.push_back(&queue, Node{u16(then_instr.operand), new_ranges})
                     case:
                         panic("not possible")
                     }
                     instr_idx += 2
+                    if range_len(remaining_range) == 0 do continue outer
+                    ranges[instr.xmas_value] = remaining_range
                 }
             case .Compare_Gt:
                 if instr.operand >= node.ranges[instr.xmas_value][1] {
                     instr_idx += 2
                 } else {
                     then_instr := workflow[instr_idx + 1]
-                    ranges := node.ranges
-                    ranges[instr.xmas_value][0] = max(ranges[instr.xmas_value][0], instr.operand + 1)
-                    if range_len(ranges[instr.xmas_value]) == 0 {
-                        instr_idx += 2
-                        continue
-                    }
-                    debug_print("CUT AT GT - new range:", ranges)
+                    new_ranges := ranges
+                    new_ranges[instr.xmas_value][0] = max(ranges[instr.xmas_value][0], instr.operand + 1)
+                    remaining_range := [2]int{ranges[instr.xmas_value][0], instr.operand}
+                    debug_print("CUT AT GT - new range:", new_ranges)
+                    debug_print("remaining_range", remaining_range)
                     debug_print("THEN:", then_instr)
                     #partial switch then_instr.op {
                     case .R:
                         // nothing
                     case .A:
-                        debug_print("Adding combos for:", ranges)
-                        add_all_ranges(xmas_ranges[:], ranges[:])
+                        debug_print("Adding combos for:", new_ranges)
+                        // add_all_ranges(xmas_ranges[:], new_ranges[:])
+                        result += compute_combos(new_ranges)
                     case .Goto:
-                        q.push_back(&queue, Node{u16(then_instr.operand), ranges})
+                        q.push_back(&queue, Node{u16(then_instr.operand), new_ranges})
                     case:
                         panic("not possible")
                     }
                     instr_idx += 2
+                    if range_len(remaining_range) == 0 do continue outer
+                    ranges[instr.xmas_value] = remaining_range
                 }
             case .None:
                 fallthrough
@@ -349,22 +316,7 @@ run_theoretical_workflows :: proc(workflows: map[u16]Workflow) -> int {
             }
         }
     }
-
-    fmt.println(xmas_ranges)
-
-    total_xmas_values: [4]int
-    for rs, i in xmas_ranges {
-        fmt.println(rs)
-        for r in rs {
-            total_xmas_values[i] += range_len(r)
-        }
-    }
-
-    combos := 1
-    for v in total_xmas_values {
-        combos *= v
-    }
-    return combos
+    return result
 }
 
 
