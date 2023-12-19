@@ -320,7 +320,6 @@ run_theoretical_workflows :: proc(workflows: map[u16]Workflow) -> int {
     return result
 }
 
-
 main :: proc() {
     arena_backing := make([]u8, 8 * mem.Megabyte)
     solution_arena: mem.Arena
@@ -330,7 +329,12 @@ main :: proc() {
     context.allocator = alloc
     context.temp_allocator = alloc
 
-    iters := 100_000
+    when AVG_RUNTIME {
+        iters := 10_000
+    } else {
+        iters := 1
+    }
+
     pt1_ans: int
     pt1_total_time: time.Duration
     for i in 0..<iters {
@@ -371,6 +375,8 @@ part_1_test :: proc(t: ^testing.T) {
 part_2_test :: proc(t: ^testing.T) {
     testing.expect_value(t, part_2(test_input), 167_409_079_868_000)
 }
+
+AVG_RUNTIME :: #config(AVG, false)
 
 input := #load("./input.txt", string)
 test_input := `px{a<2006:qkq,m>2090:A,rfg}

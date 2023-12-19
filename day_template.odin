@@ -28,18 +28,37 @@ main :: proc() {
     context.allocator = alloc
     context.temp_allocator = alloc
 
-    pt1_start := time.now()
-    pt1_ans := part_1(input)
-    pt1_end := time.now()
-    fmt.println("P1:", pt1_ans, "Time:", time.diff(pt1_start, pt1_end), "Memory Used:", solution_arena.peak_used)
+    when AVG_RUNTIME {
+        iters := 10_000
+    } else {
+        iters := 1
+    }
+
+    pt1_ans: int
+    pt1_total_time: time.Duration
+    for i in 0..<iters {
+        pt1_start := time.now()
+        pt1_ans = part_1(input)
+        pt1_end := time.now()
+        pt1_total_time += time.diff(pt1_start, pt1_end)
+        free_all(context.allocator)
+    }
+
+    fmt.println("P1:", pt1_ans, "Time:", pt1_total_time / time.Duration(iters), "Memory Used:", solution_arena.peak_used)
 
     free_all(context.allocator)
     solution_arena.peak_used = 0
 
-    pt2_start := time.now()
-    pt2_ans := part_2(input)
-    pt2_end := time.now()
-    fmt.println("P2:", pt2_ans, "Time:", time.diff(pt2_start, pt2_end), "Memory Used:", solution_arena.peak_used)
+    pt2_ans: int
+    pt2_total_time: time.Duration
+    for i in 0..<iters {
+        pt2_start := time.now()
+        pt2_ans = part_1(input)
+        pt2_end := time.now()
+        pt2_total_time += time.diff(pt2_start, pt2_end)
+        free_all(context.allocator)
+    }
+    fmt.println("P2:", pt2_ans, "Time:", pt2_total_time / time.Duration(iters), "Memory Used:", solution_arena.peak_used)
 
     free_all(context.allocator)
     solution_arena.peak_used = 0
@@ -54,6 +73,11 @@ part_1_test :: proc(t: ^testing.T) {
 @(test)
 part_2_test :: proc(t: ^testing.T) {
     testing.expect_value(t, part_2(test_input), 1234)
+}
+
+@(disabled = !(ODIN_DEBUG || ODIN_TEST))
+debug_print :: proc(args: ..any) {
+    fmt.println(..args)
 }
 
 input := #load("./input.txt", string)
