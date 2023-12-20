@@ -80,5 +80,7 @@ debug_print :: proc(args: ..any) {
     fmt.println(..args)
 }
 
+AVG_RUNTIME :: #config(AVG, false)
+
 input := #load("./input.txt", string)
 test_input := ``
