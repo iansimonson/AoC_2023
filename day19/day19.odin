@@ -354,7 +354,7 @@ main :: proc() {
     pt2_total_time: time.Duration
     for i in 0..<iters {
         pt2_start := time.now()
-        pt2_ans = part_1(input)
+        pt2_ans = part_2(input)
         pt2_end := time.now()
         pt2_total_time += time.diff(pt2_start, pt2_end)
         free_all(context.allocator)
