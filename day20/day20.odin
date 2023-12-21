@@ -18,6 +18,7 @@ Last_Sent :: struct {
     label: Label,
     prev: bool,
 }
+Label_List :: sa.Small_Array(10, Label)
 TLabel_List :: sa.Small_Array(10, Typed_Label)
 State_List :: sa.Small_Array(10, Last_Sent)
 
@@ -123,74 +124,53 @@ Last_Sent2 :: struct {
 }
 
 part_2 :: proc(data: string) -> int {
-    adj_list, f_or_c, conjuncts := parse_lists_2(data)
-    flip_flops: map[Label]int
+    adj_list, f_or_c, flip_flops, conjuncts := parse_lists(data)
+    flip_flops_cycle_count: map[Label]int
 
-    queue: q.Queue(State2)
-
-    q.push_back(&queue, State2{BROADCAST, Typed_Label(BROADCAST), 1})
-    for q.len(queue) != 0 {
-        state := q.pop_front(&queue)
-        debug_print("HANDLING:", state)
-        label := as_label(state.tlabel)
-
-        fmt.println(state)
-        
-        if label == OUTPUT do continue
-        // LOL OF COURSE THIS WAS THE THING TO FIND IN PT2
-        if label == RX {
-            return state.from_goes_low_every
-        }
-
-        is_flipflop := is_label_flipflop(state.tlabel)
-        debug_print(state.tlabel, label, is_flipflop)
-
-        if label == BROADCAST {
-            adj := adj_list[label]
-            for i in 0..<sa.len(adj) {
-                nxt := sa.get(adj, i)
-                q.append(&queue, State2{label, nxt, 1})
+    // build reverse list
+    rev_adj_list := make(map[Label]Label_List)
+    for k, v in adj_list {
+        for i in 0..<sa.len(v) {
+            tlabel := sa.get(v, i)
+            label := as_label(tlabel)
+            if label not_in rev_adj_list {
+                rev_adj_list[label] = {}
             }
-        } else if is_flipflop {
-            adj := adj_list[label]
-            flip_flops[label] = 2 * next.from_goes_low_every
-            for i in 0..<sa.len(adj) {
-                nxt := sa.get(adj, i)
-                q.append(&queue, State2{label, nxt, 2 * next.from_goes_low_every})
-            }
-        } else if !is_flipflop {
-            cycle_low: int
-            if prev_cycle_low, cl_exists := cycle_to_low[label]; !cl_exists {
-                conj := conjuncts[label]
-                m_ff: int
-                lcm_conjs := 1
-                for i in 0..<sa.len(conj) {
-                    cl := sa.get(conj, i)
-                    if cl.label == BROADCAST do continue
-                    fc := f_or_c[cl.label]
-                    if fc {
-                        m_ff = max(m_ff, (flip_flops[cl.label] or_else 2))
-                    } else {
-                        lcm_conjs = math.lcm(lcm_conjs, cl.prev)
-                    }
-                }
-                ff_input_is_high := m_ff - 1
-                for ff_input_is_high % lcm_conjs == 0 {
-                    ff_input_is_high += m_ff
-                }
-                cycle_low = math.lcm(cycle_low, lcm_conjs)
-                cycle_to_low[label] = cycle_low
-            } else {
-                cycle_low = prev_cycle_low
-            }
-            
-            adj := adj_list[label]
-            for i in 0..<sa.len(adj) {
-                nxt := sa.get(adj, i)
-                q.append(&queue, State2{label, nxt, cycle_low})
+            rev_list := &rev_adj_list[label]
+            if !sa_contains(rev_list, k) {
+                sa.append(rev_list, k)
             }
         }
     }
+
+    recurse_cycles :: proc(rev_adj_list: map[Label]Label_List, f_or_c: map[Label]bool, cur_label: Label, needs: bool) -> int {
+        if cur_label == BROADCAST do return 1
+
+        fc := f_or_c[cur_label]
+        adj_list := rev_adj_list[cur_label]
+        if fc { // flip flop
+            assert(sa.len(adj_list) == 1)
+            return recurse_cycles(rev_adj_list, f_or_c, sa.get(adj_list, 0), false)
+        } else { // conj do LCM
+            result := 1
+            for i in 0..<sa.len(adj_list) {
+                result = math.lcm(result, recurse_cycles(rev_adj_list, f_or_c, sa.get(adj_list, i)))
+            }
+        }
+        return 0
+    }
+    
+    cycles: int
+    rx_list := rev_adj_list[RX]
+
+    
+    for {
+        node := q.pop_front(&queue)
+        fmt.println(label_to_str(node), rev_adj_list[node])
+
+        break
+    }
+    
 
     return 0
 }
@@ -248,70 +228,6 @@ parse_lists :: proc(data: string) -> (adj_list: map[Label]TLabel_List, f_or_c, f
                 if conjexists {
                     if _, found := linear_search_key(conj.data[:sa.len(conj^)], proc(ls: Last_Sent) -> Label { return ls.label }, k); !found {
                         sa.append(conj, Last_Sent{k, false})
-                    }
-                }
-            }
-            sa.set(&v, i, adj)
-        }
-    }
-
-    debug_print_adj_list(adj_list)
-    debug_print("DONE")
-
-    return
-}
-
-parse_lists_2 :: proc(data: string) -> (adj_list: map[Label]TLabel_List, f_or_c: map[Label]bool, conjuncts: map[Label]State_List2) {
-    data := data
-    adj_list = make(map[Label]TLabel_List)
-    f_or_c = make(map[Label]bool)
-    conjuncts = make(map[Label]State_List2)
-
-    adj_list[OUTPUT] = {}
-    f_or_c[OUTPUT] = false
-
-    reg_idx := 1
-    for line in strings.split_lines_iterator(&data) {
-        line := line
-        if len(line) == 0 do continue
-
-        switch line[0] {
-        case '&':
-            // conjunction
-            label := str_to_label(strings.trim_space(line[1:3]))
-            adj_list[label] = parse_adj_list(line)
-            f_or_c[label] = false
-            conjuncts[label] = {}
-
-        case '%':
-            // flip flop
-            label := str_to_label(strings.trim_space(line[1:3]))
-            adj_list[label] = parse_adj_list(line)
-            f_or_c[label] = true
-        case 'b':
-            // broadcast
-            adj_list[BROADCAST] = parse_adj_list(line)
-
-        case:
-            panic("Not possible")
-        }
-    }
-
-    for k, &v in adj_list {
-        for i in 0..<sa.len(v) {
-            adj := sa.get(v, i)
-            debug_print(adj)
-            if fc, exists := f_or_c[Label(adj)]; !exists {
-                adjlist, adjexists := adj_list[Label(adj)]
-                assert(!adjexists)
-            } else if fc {
-                adj = adj | 0x8000
-            } else {
-                conj, conjexists := &conjuncts[Label(adj)]
-                assert(conjexists || Label(adj) == OUTPUT)
-                if conjexists {
-                    if _, found := linear_search_key(conj.data[:sa.len(conj^)], proc(ls: Last_Sent) -> Label { return ls.label }, k); !found {
-                        sa.append(conj, Last_Sent2{k, 0})
                     }
                 }
             }
@@ -449,6 +365,16 @@ linear_search_key :: proc(array: $A/[]$T, f: proc(T) -> $K, value: K) -> (index:
 		}
 	}
 	return -1, false
+}
+
+sa_contains :: proc(array: $A/^sa.Small_Array($N, $T), value: T) -> bool {
+    _, found := slice.linear_search(array.data[:sa.len(array^)], value)
+    return found
+}
+
+sa_contains_key :: proc(array: $A/^sa.Small_Array($N, $T), f: proc(T) -> $K, value: K) -> bool {
+    _, found := linear_search_key(array.data[:sa.len(array)], f, value)
+    return found
 }
 
 AVG_RUNTIME :: #config(AVG, false)
