@@ -118,8 +118,8 @@ part_1 :: proc(data: string, steps: int) -> int {
 
     For the diagonals, it's the same thing but using the heightmap of the diagonal we are starting from
     there's some partial amount at the end also
-    Since the overall floodfill is rhombus-ish shaped in nature, the number of diagonal squares
-    should be the sum of 1...N or (N(N+1) / 2) squares
+    Since the overall floodfill is rhombus-ish shaped in nature, the number of total diagonal full grids
+    in one quadrant should be the sum of 1...N or (N(N+1) / 2) squares (and then there are 4 qudrants)
 
     These actually alternate parity as they grow out from the center so
     in terms of full grids it's actually the sum of the first N/2 odd numbers (N^2) * diagonal_odd_parity_reachable
