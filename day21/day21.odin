@@ -122,8 +122,8 @@ part_1 :: proc(data: string, steps: int) -> int {
     in one quadrant should be the sum of 1...N or (N(N+1) / 2) squares (and then there are 4 qudrants)
 
     These actually alternate parity as they grow out from the center so
-    in terms of full grids it's actually the sum of the first N/2 odd numbers (N^2) * diagonal_odd_parity_reachable
-    plus the sum of the first N/2 even numbers or N * (N + 1) * diagonal_even_parity_reachable
+    in terms of full grids it's actually the sum of the first (N+1)/2 odd numbers (((N+1)/2)^2) * diagonal_odd_parity_reachable
+    plus the sum of the first N/2 even numbers or (N/2) * ((N/2) + 1) * diagonal_even_parity_reachable
 
     Then...there should be N + 1 partial reachable grids...I think maybe this is where I'm going wrong
     because there's actually more than that and less at the same time and you can enter from multiple
