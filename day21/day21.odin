@@ -91,6 +91,46 @@ part_1 :: proc(data: string, steps: int) -> int {
     return solve(GridN{transmute([]u8) data, width, height}, s_pos, steps)
 }
 
+/*
+    I don't know if this makes sense for my math or not to begin with
+    or I just have a bug in the program and I'm almost there.
+
+    How I think it should work:
+
+    Basically, the number of reachable squares in the grid is based
+    on the parity of the step count you have. You can never reach a square
+    1 space away no matter how many steps you take if you are taking an even
+    number of steps.
+
+    So the center grid has a set of reachable squares. that hasn't changed
+    then the parity swaps in each cardinal direction, and _doesn't_ change in
+    each diagonal region (b/c you take 2 steps)
+
+    Remove the steps required to get to the 8 corners / center edge squares we are going
+    to use becasue the end rows/cols of the grid are empty (as is the center row/col)
+    Then step once into each surrounding grid (8 neighbors)
+
+    For the centers, calculate the furthest number of grids we can go upward that can be
+    fully reached. Given the heightmaps for reachable squares (num squares required to reach)
+
+    The number of full grids reachable should be (steps_remaining - highest square reachable) / grid_dimension
+    The remaining steps to simulate in this direction should be (steps_remaining % grid_dimension) + highest square reachable
+
+    For the diagonals, it's the same thing but using the heightmap of the diagonal we are starting from
+    there's some partial amount at the end also
+    Since the overall floodfill is rhombus-ish shaped in nature, the number of diagonal squares
+    should be the sum of 1...N or (N(N+1) / 2) squares
+
+    These actually alternate parity as they grow out from the center so
+    in terms of full grids it's actually the sum of the first N/2 odd numbers (N^2) * diagonal_odd_parity_reachable
+    plus the sum of the first N/2 even numbers or N * (N + 1) * diagonal_even_parity_reachable
+
+    Then...there should be N + 1 partial reachable grids...I think maybe this is where I'm going wrong
+    because there's actually more than that and less at the same time and you can enter from multiple
+    directions...maybe I need to actually flood-fill the borders from each point? but there are so many points
+
+*/
+
 part_2 :: proc(data: string, steps: int) -> (result: int) {
     data := data
     newline := strings.index_byte(data, '\n')
@@ -168,8 +208,6 @@ part_2 :: proc(data: string, steps: int) -> (result: int) {
     // AND THEN CALC THE PARTIALS LATER
     steps_remaining := make([]int, len(top_steps_left))
     copy(steps_remaining, top_steps_left)
-    odd_parity := reachable(grid, bottom_row_heightmaps[1], (steps / 2) + 1)
-    even_parity := reachable(grid, bottom_row_heightmaps[1], steps / 2)
 
     steps_remaining[1] -= 1 // step into new grid
     steps_remaining[0] -= 2 // step over then up into diag grid
@@ -184,6 +222,9 @@ part_2 :: proc(data: string, steps: int) -> (result: int) {
     }
 
     // four centers:
+    mid_odd_parity := reachable(grid, bottom_row_heightmaps[1], (steps / 2) + 1)
+    mid_even_parity := reachable(grid, bottom_row_heightmaps[1], steps / 2)
+
     mid_reachables: [4]int
     mid_height_maps: [4][]int
     mid_height_maps[0] = top_row_heightmaps[1]
@@ -195,6 +236,16 @@ part_2 :: proc(data: string, steps: int) -> (result: int) {
     mid_max_heights[1] = slice.max(left_column_heightmaps[1])
     mid_max_heights[2] = slice.max(right_column_heightmaps[1])
     mid_max_heights[3] = slice.max(bottom_row_heightmaps[1])
+    mid_odd_parities: [4]int
+    mid_odd_parities[0] = reachable(grid, top_row_heightmaps[1], (steps / 2) + 1)
+    mid_odd_parities[1] = reachable(grid, left_column_heightmaps[1], (steps / 2) + 1)
+    mid_odd_parities[2] = reachable(grid, right_column_heightmaps[1], (steps / 2) + 1)
+    mid_odd_parities[3] = reachable(grid, bottom_row_heightmaps[1], (steps / 2) + 1)
+    mid_even_parities: [4]int
+    mid_even_parities[0] = reachable(grid, top_row_heightmaps[1], (steps / 2))
+    mid_even_parities[1] = reachable(grid, left_column_heightmaps[1], (steps / 2))
+    mid_even_parities[2] = reachable(grid, right_column_heightmaps[1], (steps / 2))
+    mid_even_parities[3] = reachable(grid, bottom_row_heightmaps[1], (steps / 2))
 
     mid_full_grids: [4]int
     mid_steps_remaining: [4]int
@@ -234,6 +285,18 @@ part_2 :: proc(data: string, steps: int) -> (result: int) {
     corner_height_maps[2] = bottom_row_heightmaps[0]
     corner_height_maps[3] = bottom_row_heightmaps[2]
 
+    corner_odd_parities: [4]int
+    corner_odd_parities[0] = reachable(grid, top_row_heightmaps[0], (steps / 2) + 1)
+    corner_odd_parities[1] = reachable(grid, top_row_heightmaps[2], (steps / 2) + 1)
+    corner_odd_parities[2] = reachable(grid, bottom_row_heightmaps[0], (steps / 2) + 1)
+    corner_odd_parities[3] = reachable(grid, bottom_row_heightmaps[2], (steps / 2) + 1)
+
+    corner_even_parities: [4]int
+    corner_even_parities[0] = reachable(grid, top_row_heightmaps[0], (steps / 2))
+    corner_even_parities[1] = reachable(grid, top_row_heightmaps[2], (steps / 2))
+    corner_even_parities[2] = reachable(grid, bottom_row_heightmaps[0], (steps / 2))
+    corner_even_parities[3] = reachable(grid, bottom_row_heightmaps[2], (steps / 2))
+
     corner_full_grids: [4]int
     corner_steps_remaining: [4]int
 
@@ -262,7 +325,7 @@ part_2 :: proc(data: string, steps: int) -> (result: int) {
     // MIDS SUM:
     mid_sum: int
     for fg, i in mid_full_grids {
-        mid_sum += (fg + 1) / 2 * odd_parity + (fg / 2) * even_parity
+        mid_sum += (fg + 1) / 2 * mid_odd_parities[i] + (fg / 2) * mid_even_parities[i]
     }
     mid_sum += math.sum(mid_reachables[:])
 
@@ -273,8 +336,8 @@ part_2 :: proc(data: string, steps: int) -> (result: int) {
         corner_sum += corner_reachables[i] * (fg + 1)
         num_odd_nums := (fg + 1) / 2
         num_even_nums := fg / 2
-        corner_sum += num_odd_nums * num_odd_nums * odd_parity
-        corner_sum += num_even_nums * (num_even_nums + 1) * even_parity
+        corner_sum += num_odd_nums * num_odd_nums * corner_odd_parities[i]
+        corner_sum += num_even_nums * (num_even_nums + 1) * corner_even_parities[i]
     }
 
     fmt.println(mid_sum, corner_sum)
