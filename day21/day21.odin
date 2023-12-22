@@ -104,117 +104,182 @@ part_2 :: proc(data: string, steps: int) -> (result: int) {
 
     s_height_map := gen_heightmap(grid, s_pos)
 
-    d1, d2, d3, d4 := Pos{0, 0}, Pos{newline - 1, 0}, Pos{0, height - 1}, Pos{newline - 1, height - 1}
-    d1_idx, d2_idx, d3_idx, d4_idx := p2idx(d1, width), p2idx(d2, width), p2idx(d3, width), p2idx(d4, width)
-    s_d1, s_d2, s_d3, s_d4 := s_height_map[d1_idx], s_height_map[d2_idx], s_height_map[d3_idx], s_height_map[d4_idx]
+    center_reachable := reachable(grid, s_height_map, steps)
 
-    fmt.println(steps)
-    debug_print(s_d1, s_d2, s_d3, s_d4)
-    result += reachable(grid, s_height_map, steps)
+    fmt.println(center_reachable)
 
-    steps_left := [4]int{steps - s_d1, steps - s_d2, steps - s_d3, steps - s_d4}
-    steps_left[0] = max(0, steps_left[0])
-    steps_left[1] = max(0, steps_left[1])
-    steps_left[2] = max(0, steps_left[2])
-    steps_left[3] = max(0, steps_left[3])
-    print_heightmap(s_height_map, grid.width)
-    fmt.println(steps_left)
-    if math.sum(steps_left[:]) <= 0 do return // we finish in S_0
-
-    d1_height_map := gen_heightmap(grid, Pos{0, 0})
-    d2_height_map := gen_heightmap(grid, Pos{newline - 1, 0})
-    d3_height_map := gen_heightmap(grid, Pos{0, height - 1})
-    d4_height_map := gen_heightmap(grid, Pos{newline - 1, height - 1})
-
-    d1_full_reachable: [2]int
-    d2_full_reachable: [2]int
-    d3_full_reachable: [2]int
-    d4_full_reachable: [2]int
-
-    // calc fully reachable squares based on parity of step count
-    d1_full_reachable[steps % 2], d1_full_reachable[ (steps + 1) % 2] = reachable(grid, d1_height_map, steps), reachable(grid, d1_height_map, steps + 1)
-    d2_full_reachable[steps % 2], d2_full_reachable[ (steps + 1) % 2] = reachable(grid, d2_height_map, steps), reachable(grid, d2_height_map, steps + 1)
-    d3_full_reachable[steps % 2], d3_full_reachable[ (steps + 1) % 2] = reachable(grid, d3_height_map, steps), reachable(grid, d3_height_map, steps + 1)
-    d4_full_reachable[steps % 2], d4_full_reachable[ (steps + 1) % 2] = reachable(grid, d4_height_map, steps), reachable(grid, d4_height_map, steps + 1)
-
-    // just a helper function
-    calc_in_dir :: proc(grid: GridN, steps_left, mod_size: int, height_map: []int, full_reach: [2]int) -> (dim, n_reachable, part_reachable: int) {
-        if steps_left > 0 {
-            remaining_steps :=  steps_left - 1
-            full_squares := remaining_steps / mod_size
-            end_steps := remaining_steps % mod_size
-            fulls := (full_squares + 1) / 2 * full_reach[remaining_steps % 2] + full_squares / 2 * full_reach[(remaining_steps + 1) % 2]
-            ends := reachable(grid, height_map, end_steps)
-
-            dim = full_squares + 1
-            n_reachable = fulls + ends
-            part_reachable = ends
+    // empty rows/cols are locations we can travel through a grid with minimum steps
+    // in horizontal/vertical directions. it _happens_ to be the case that in the main grid
+    // it's the center row/column that's also empty
+    empty_rows: [dynamic]int
+    outer_rows: for j in 0..<grid.height {
+        for i in 0..<(grid.width - 1) {
+            char := grid.data[j * grid.width + i]
+            if  char != '.' && char != 'S' do continue outer_rows
         }
-        return
+        append(&empty_rows, j)
+    }
+    empty_cols: [dynamic]int
+    outer_cols: for i in 0..<grid.width - 1 {
+        for j in 0..<grid.height {
+            char := grid.data[j * grid.width + i]
+            if  char != '.' && char != 'S' do continue outer_cols
+        }
+        append(&empty_cols, i)
     }
 
-    d1_left_dim, d1_left_reachable, d1_left_partial := calc_in_dir(grid, steps_left[0], grid.width - 1, d2_height_map, d2_full_reachable)
-    d1_up_dim, d1_up_reachable, d1_up_partial := calc_in_dir(grid, steps_left[0], grid.height, d3_height_map, d3_full_reachable)
+
+    //heightmaps of the 8 squares of interest
+    // in order: top-left, top-mid, top-right
+    // left-mid, right-mid, bottom-left
+    // bottom-mid, bottom-right
+
+    top_row_heightmaps := make([][]int, len(empty_cols))
+    bottom_row_heightmaps := make([][]int, len(empty_cols))
+    left_column_heightmaps := make([][]int, len(empty_rows))
+    right_column_heightmaps := make([][]int, len(empty_rows))
+    for col, i in empty_cols {
+        top_row_heightmaps[i] = gen_heightmap(grid, Pos{col, 0})
+        bottom_row_heightmaps[i] = gen_heightmap(grid, Pos{col, grid.height - 1})
+    }
+    for row, i in empty_rows {
+        left_column_heightmaps[i] = gen_heightmap(grid, Pos{0, row})
+        right_column_heightmaps[i] = gen_heightmap(grid, Pos{grid.width - 2, row})
+    }
+
+    top_steps_left := make([]int, len(top_row_heightmaps))
+    bottom_steps_left := make([]int, len(bottom_row_heightmaps))
+    left_steps_left := make([]int, len(left_column_heightmaps))
+    right_steps_left := make([]int, len(right_column_heightmaps))
+
+    for col, i in empty_cols {
+        top_steps_left[i] = max(0, steps - s_height_map[col])
+        bottom_steps_left[i] = max(0, steps - s_height_map[(grid.height - 1) * grid.width + col])
+    }
+    for row, i in empty_rows {
+        left_steps_left[i] = max(0, steps - s_height_map[row * grid.width])
+        right_steps_left[i] = max(0, steps - s_height_map[row * grid.width + grid.width - 2])
+    }
+
+    fmt.println(top_steps_left)
+    assert(slice.simple_equal(top_steps_left, right_steps_left))
+    assert(slice.simple_equal(bottom_steps_left, right_steps_left))
+    // ALL THE SAME HEIGHTMAPS AND SUCH... SO WE CAN JUST CALC IN ONE DIRECTION
+    // AND THEN CALC THE PARTIALS LATER
+    steps_remaining := make([]int, len(top_steps_left))
+    copy(steps_remaining, top_steps_left)
+    odd_parity := reachable(grid, bottom_row_heightmaps[1], (steps / 2) + 1)
+    even_parity := reachable(grid, bottom_row_heightmaps[1], steps / 2)
+
+    steps_remaining[1] -= 1 // step into new grid
+    steps_remaining[0] -= 2 // step over then up into diag grid
+    steps_remaining[2] -= 2
+    fmt.println("SR:", steps_remaining)
+    // these are the same in all directions
+
+
+    parities: [3]int
+    for sr, i in steps_remaining {
+        parities[i] = sr % 2
+    }
+
+    // four centers:
+    mid_reachables: [4]int
+    mid_height_maps: [4][]int
+    mid_height_maps[0] = top_row_heightmaps[1]
+    mid_height_maps[1] = left_column_heightmaps[1]
+    mid_height_maps[2] = right_column_heightmaps[1]
+    mid_height_maps[3] = bottom_row_heightmaps[1]
+    mid_max_heights: [4]int
+    mid_max_heights[0] = slice.max(top_row_heightmaps[1])
+    mid_max_heights[1] = slice.max(left_column_heightmaps[1])
+    mid_max_heights[2] = slice.max(right_column_heightmaps[1])
+    mid_max_heights[3] = slice.max(bottom_row_heightmaps[1])
+
+    mid_full_grids: [4]int
+    mid_steps_remaining: [4]int
+
+    for m, i in mid_max_heights {
+        mid_full_grids[i] = (steps_remaining[1] - m) / grid.height
+        mid_steps_remaining[i] = (steps_remaining[1] % grid.height) + m
+    }
+    for {
+        for i in 0..<len(mid_reachables) {
+            mid_reachables[i] += reachable(grid, mid_height_maps[i], mid_steps_remaining[i])
+            if mid_steps_remaining[i] > grid.height {
+                mid_steps_remaining[i] -= grid.height
+            } else {
+                mid_steps_remaining[i] = 0
+            }
+        }
+        if slice.all_of(mid_steps_remaining[:], 0) do break
+    }
+
+    fmt.println("MIDS:")
+    fmt.println(mid_full_grids)
+    fmt.println(mid_reachables)
+    fmt.println("========")
+
+
+    corner_max_heights: [4]int
+    corner_reachables: [4]int
+    corner_max_heights[0] = slice.max(top_row_heightmaps[0])
+    corner_max_heights[1] = slice.max(top_row_heightmaps[2])
+    corner_max_heights[2] = slice.max(bottom_row_heightmaps[0])
+    corner_max_heights[3] = slice.max(bottom_row_heightmaps[2])
     
-    d2_right_dim, d2_right_reachable, d2_right_partial := calc_in_dir(grid, steps_left[1], grid.width - 1, d1_height_map, d1_full_reachable)
-    d2_up_dim, d2_up_reachable, d2_up_partial := calc_in_dir(grid, steps_left[1], grid.height, d4_height_map, d4_full_reachable)
+    corner_height_maps: [4][]int
+    corner_height_maps[0] = top_row_heightmaps[0]
+    corner_height_maps[1] = top_row_heightmaps[2]
+    corner_height_maps[2] = bottom_row_heightmaps[0]
+    corner_height_maps[3] = bottom_row_heightmaps[2]
 
-    d3_left_dim, d3_left_reachable, d3_left_partial := calc_in_dir(grid, steps_left[2], grid.width - 1, d4_height_map, d4_full_reachable)
-    d3_down_dim, d3_down_reachable, d3_down_partial := calc_in_dir(grid, steps_left[2], grid.height, d1_height_map, d1_full_reachable)
+    corner_full_grids: [4]int
+    corner_steps_remaining: [4]int
 
-    d4_right_dim, d4_right_reachable, d4_right_partial := calc_in_dir(grid, steps_left[3], grid.width - 1, d3_height_map, d3_full_reachable)
-    d4_down_dim, d4_down_reachable, d4_down_partial := calc_in_dir(grid, steps_left[3], grid.height, d2_height_map, d2_full_reachable)
-
-    max_left_dim := max(d1_left_dim, d3_left_dim)
-    max_up_dim := max(d1_up_dim, d2_up_dim)
-    max_right_dim := max(d2_right_dim, d4_right_dim)
-    max_down_dim := max(d3_down_dim, d4_down_dim)
-
-    // printed to prove it's NxN so just choose 1
-    N := max_left_dim
-    ND_partial := max_left_dim - 1
-    ND_full := max_left_dim - 2
-
-    Start_Parity_Count: int
-    Other_Parity_Count: int
-    for i in 1..=ND_full {
-        if i % 2 == 1 {
-            Other_Parity_Count += i
-        } else {
-            Start_Parity_Count += i
-        }
+    for m, i in corner_max_heights {
+        corner_full_grids[i] = (steps_remaining[0] - m) / grid.height
+        corner_steps_remaining[i] = (steps_remaining[0] % grid.height) + m
     }
-    parity_end_diag := (ND_partial % 2 == 1)
+    for {
+        for i in 0..<len(corner_reachables) {
+            corner_reachables[i] += reachable(grid, corner_height_maps[i], corner_steps_remaining[i])
+            if corner_steps_remaining[i] > grid.height {
+                corner_steps_remaining[i] -= grid.height
+            } else {
+                corner_steps_remaining[i] = 0
+            }
+        }
+        if slice.all_of(corner_steps_remaining[:], 0) do break
+    }
 
-    max_left_reachable := max(d1_left_reachable, d3_left_reachable)
-    max_up_reachable := max(d1_up_reachable, d2_up_reachable)
-    max_right_reachable := max(d2_right_reachable, d4_right_reachable)
-    max_down_reachable := max(d3_down_reachable, d4_down_reachable)
+    fmt.println("CORNERS:")
+    fmt.println(corner_full_grids)
+    fmt.println(corner_reachables)
+    fmt.println("========")
 
-    result += max_left_reachable + max_right_reachable + max_left_reachable + max_down_reachable
 
-    // left/up diagonal (n - 2)*(d4_full) d1 -> d4
-    ld_sr := steps_left[0] - 1
-    result += Start_Parity_Count * d4_full_reachable[ld_sr % 2] + Other_Parity_Count * d4_full_reachable[(ld_sr + 1) % 2]
-    result += ND_partial * d3_left_partial
+    // MIDS SUM:
+    mid_sum: int
+    for fg, i in mid_full_grids {
+        mid_sum += (fg + 1) / 2 * odd_parity + (fg / 2) * even_parity
+    }
+    mid_sum += math.sum(mid_reachables[:])
 
-    // up/right diagonal - entering d2 -> d3
-    // don't care at this point just want the parity
-    urd_sr := steps_left[1] - 1
-    result += Start_Parity_Count * d3_full_reachable[urd_sr % 2] + Other_Parity_Count * d3_full_reachable[(urd_sr + 1) % 2]
-    result += ND_partial * d4_right_partial
+    // CORNERS:
+    // something weird with the diagonals... need to do N full grids + n - 1 full grids + n - 2 full grids + ... + 
+    corner_sum: int
+    for fg, i in corner_full_grids {
+        corner_sum += corner_reachables[i] * (fg + 1)
+        num_odd_nums := (fg + 1) / 2
+        num_even_nums := fg / 2
+        corner_sum += num_odd_nums * num_odd_nums * odd_parity
+        corner_sum += num_even_nums * (num_even_nums + 1) * even_parity
+    }
 
-    // right/down diagonal - entering d4 -> d1
-    rdd_sr := steps_left[3] - 1
-    result += Start_Parity_Count * d1_full_reachable[rdd_sr % 2] + Other_Parity_Count * d1_full_reachable[(rdd_sr + 1) % 2]
-    result += ND_partial * d4_down_partial
+    fmt.println(mid_sum, corner_sum)
 
-    // down/left diagonal - entering d3 -> d2
-    dld_sr := steps_left[2] - 1
-    result += Start_Parity_Count * d2_full_reachable[dld_sr % 2] + Other_Parity_Count * d2_full_reachable[(dld_sr + 1) % 2]
-    result += ND_partial * d3_down_partial
-
-    return result
+    return mid_sum + corner_sum + center_reachable
 }
 
 // height map from a start point
@@ -265,7 +330,7 @@ gen_heightmap :: proc(grid: GridN, start: Pos) -> []int {
         if height_grid[next_idx] != -1 do continue
         
         if grid.data[next_idx] == '#' || grid.data[next_idx] == '\n' {
-            height_grid[next_idx] = max(int)
+            height_grid[next_idx] = -2
             continue
         }
 
@@ -284,13 +349,13 @@ gen_heightmap :: proc(grid: GridN, start: Pos) -> []int {
 }
 
 main :: proc() {
-    arena_backing := make([]u8, 8 * mem.Megabyte)
-    solution_arena: mem.Arena
-    mem.arena_init(&solution_arena, arena_backing)
+    // arena_backing := make([]u8, 8 * mem.Megabyte)
+    // solution_arena: mem.Arena
+    // mem.arena_init(&solution_arena, arena_backing)
 
-    alloc := mem.arena_allocator(&solution_arena)
-    context.allocator = alloc
-    context.temp_allocator = alloc
+    // alloc := mem.arena_allocator(&solution_arena)
+    // context.allocator = alloc
+    // context.temp_allocator = alloc
 
     when AVG_RUNTIME {
         iters := 10_000
@@ -305,13 +370,13 @@ main :: proc() {
         pt1_ans = part_1(input, 64)
         pt1_end := time.now()
         pt1_total_time += time.diff(pt1_start, pt1_end)
-        free_all(context.allocator)
+        // free_all(context.allocator)
     }
 
-    fmt.println("P1:", pt1_ans, "Time:", pt1_total_time / time.Duration(iters), "Memory Used:", solution_arena.peak_used)
+    fmt.println("P1:", pt1_ans, "Time:", pt1_total_time / time.Duration(iters))
 
-    free_all(context.allocator)
-    solution_arena.peak_used = 0
+    // free_all(context.allocator)
+    // solution_arena.peak_used = 0
 
     pt2_ans: int
     pt2_total_time: time.Duration
@@ -320,12 +385,12 @@ main :: proc() {
         pt2_ans = part_2(input, 26_501_365)
         pt2_end := time.now()
         pt2_total_time += time.diff(pt2_start, pt2_end)
-        free_all(context.allocator)
+        // free_all(context.allocator)
     }
-    fmt.println("P2:", pt2_ans, "Time:", pt2_total_time / time.Duration(iters), "Memory Used:", solution_arena.peak_used)
+    fmt.println("P2:", pt2_ans, "Time:", pt2_total_time / time.Duration(iters))
 
-    free_all(context.allocator)
-    solution_arena.peak_used = 0
+    // free_all(context.allocator)
+    // solution_arena.peak_used = 0
 }
 
 
@@ -338,7 +403,7 @@ part_1_test :: proc(t: ^testing.T) {
 part_2_test :: proc(t: ^testing.T) {
     testing.expect_value(t, part_2(test_input, 6), 16)
     testing.expect_value(t, part_2(test_input, 10), 50)
-    // testing.expect_value(t, part_2(test_input, 50), 1594)
+    testing.expect_value(t, part_2(test_input, 50), 1594)
     // testing.expect_value(t, part_2(test_input, 100), 6536)
     // testing.expect_value(t, part_2(test_input, 500), 167004)
     // testing.expect_value(t, part_2(test_input, 1000), 668697)
